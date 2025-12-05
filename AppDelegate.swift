@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupStatusBarItem()
         setupGlobalHotKey()
+        // 不创建主窗口，只作为后台应用运行
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -41,18 +42,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func generateImage(_ sender: Any?) {
         let clipboard = NSPasteboard.general
         guard let text = clipboard.string(forType: .string), !text.isEmpty else {
-            showAlert(message: "剪贴板中没有文本内容")
-            return
-        }
-
-        if popupWindow != nil {
-            popupWindow?.close()
+            return  // 简单返回，不显示警告
         }
 
         let generator = ImageGenerator()
         if let image = generator.generateImage(from: text, theme: .light) {
-            popupWindow = PopupWindow(image: image, text: text)
-            popupWindow?.makeKeyAndOrderFront(nil)
+            let popupWindow = PopupWindow(image: image, text: text)
+            popupWindow.makeKeyAndOrderFront(nil)
 
             // 将图片复制到剪贴板
             let imagePasteboard = NSPasteboard.general
@@ -61,17 +57,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // 3秒后自动关闭窗口
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                self.popupWindow?.close()
-                self.popupWindow = nil
+                popupWindow.close()
             }
         }
     }
 
-    private func showAlert(message: String) {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "确定")
-        alert.runModal()
+    private func createMainWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 400, height: 150),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "文字分享图生成器"
+        window.center()
+        window.isReleasedWhenClosed = false
+
+        let contentView = NSView()
+        window.contentView = contentView
+
+        let label = NSTextField(labelWithString: "使用说明：\n复制文本后按 ⌘⇧C 生成分享图")
+        label.alignment = .center
+        label.isEditable = false
+        label.isBordered = false
+        label.backgroundColor = NSColor.clear
+        label.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(label)
+
+        label.centerXAnchor.constraint(equalTo: contentView.centerXAnchor).isActive = true
+        label.centerYAnchor.constraint(equalTo: contentView.centerYAnchor).isActive = true
+        label.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20).isActive = true
+        label.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20).isActive = true
+
+        window.makeKeyAndOrderFront(nil)
     }
 }
