@@ -1,57 +1,43 @@
 import Cocoa
 
-class MainApplication: NSApplication {
-    private var appWindow: NSWindow?
-    private var appDelegate = AppDelegate()
+// 创建NSApplication实例
+let app = NSApplication.shared
+app.setActivationPolicy(.regular)  // 在Dock中显示
 
-    override func finishLaunching() {
-        super.finishLaunching()
+// 创建应用代理
+let delegate = AppDelegate()
+app.delegate = delegate
 
-        // 设置应用为GUI应用
-        self.setActivationPolicy(.regular)  // 在Dock中显示
+// 创建主窗口
+let window = NSWindow()
+window.title = "文字分享图生成器"
+window.setContentSize(NSSize(width: 400, height: 200))
+window.styleMask = [.titled, .closable, .resizable]
+window.center()
+window.isReleasedWhenClosed = false
 
-        // 设置应用代理
-        self.delegate = appDelegate
+// 创建主窗口内容
+let contentView = NSView()
+window.contentView = contentView
 
-        // 创建主窗口
-        createMainWindow()
-    }
+// 添加说明文本
+let infoLabel = NSTextField(labelWithString: "使用说明：\n\n1. 复制任意文本 (⌘C)\n2. 按 ⌘⇧C 生成分享图\n3. 图片自动复制到剪贴板\n\n点击菜单栏图标 📝 查看预览")
+infoLabel.alignment = .center
+infoLabel.isEditable = false
+infoLabel.isBordered = false
+infoLabel.backgroundColor = NSColor.clear
+infoLabel.translatesAutoresizingMaskIntoConstraints = false
+contentView.addSubview(infoLabel)
 
-    private func createMainWindow() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 100, y: 100, width: 400, height: 200),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "文字分享图生成器"
-        window.center()
+// 设置约束
+infoLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor).isActive = true
+infoLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor).isActive = true
+infoLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20).isActive = true
+infoLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20).isActive = true
 
-        // 创建主窗口内容
-        let contentView = NSView()
-        window.contentView = contentView
+// 显示窗口
+window.makeKeyAndOrderFront(nil)
+app.activate(ignoringOtherApps: true)
 
-        // 添加说明文本
-        let infoLabel = NSTextField(labelWithString: "使用说明：\n\n1. 复制任意文本 (⌘C)\n2. 按 ⌘⇧C 生成分享图\n3. 图片自动复制到剪贴板\n\n点击菜单栏图标 📝 查看预览")
-        infoLabel.alignment = .center
-        infoLabel.isEditable = false
-        infoLabel.isBordered = false
-        infoLabel.backgroundColor = NSColor.controlBackgroundColor
-        infoLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(infoLabel)
-
-        NSLayoutConstraint.activate([
-            infoLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            infoLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            infoLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20),
-            infoLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20)
-        ])
-
-        appWindow = window
-        window.makeKeyAndOrderFront(nil)
-    }
-}
-
-// 运行应用
-let app = MainApplication.shared
+// 运行应用主循环
 app.run()
