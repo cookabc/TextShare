@@ -42,7 +42,16 @@ struct ThemeConfig {
 
 class ImageGenerator {
 
+    private func log(_ message: String) {
+        let timestamp = DateFormatter()
+        timestamp.dateFormat = "HH:mm:ss"
+        print("[ImageGenerator-\(timestamp.string(from: Date()))] \(message)")
+        fflush(stdout)
+    }
+
     func generateImage(from text: String, theme: Theme) -> NSImage? {
+        log("开始生成图片，文本长度: \(text.count), 主题: \(theme)")
+
         let config = ThemeConfig.config(for: theme)
 
         // 设置字体和样式
@@ -50,6 +59,8 @@ class ImageGenerator {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .left
         paragraphStyle.lineSpacing = 8
+
+        log("设置字体和样式完成")
 
         // 计算文本尺寸
         let attributes: [NSAttributedString.Key: Any] = [
@@ -60,6 +71,7 @@ class ImageGenerator {
 
         let attributedString = NSAttributedString(string: text, attributes: attributes)
         let textSize = attributedString.boundingRect(with: NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude), options: .usesLineFragmentOrigin)
+        log("计算文本尺寸完成: \(textSize)")
 
         // 计算最终图片尺寸（添加内边距）
         let padding: CGFloat = 40
@@ -67,16 +79,19 @@ class ImageGenerator {
             width: max(400, textSize.width + padding * 2),
             height: max(200, textSize.height + padding * 2)
         )
+        log("最终图片尺寸: \(imageSize)")
 
         // 创建图片
         let image = NSImage(size: imageSize)
         image.lockFocus()
+        log("开始绘制图片")
 
         // 绘制背景
         let rect = NSRect(origin: .zero, size: imageSize)
 
         if theme == .gradient {
             // 绘制渐变背景
+            log("绘制渐变背景")
             let gradient = NSGradient(colors: [
                 NSColor(red: 0.95, green: 0.95, blue: 1.0, alpha: 1.0),
                 NSColor(red: 0.9, green: 0.9, blue: 0.98, alpha: 1.0)
@@ -84,17 +99,20 @@ class ImageGenerator {
             gradient?.draw(in: rect, angle: 45)
         } else {
             // 绘制纯色背景
+            log("绘制纯色背景")
             config.backgroundColor.setFill()
             NSBezierPath(roundedRect: rect, xRadius: config.cornerRadius, yRadius: config.cornerRadius).fill()
         }
 
         // 绘制边框
         if let borderColor = config.borderColor {
+            log("绘制边框")
             borderColor.setStroke()
             NSBezierPath(roundedRect: rect, xRadius: config.cornerRadius, yRadius: config.cornerRadius).stroke()
         }
 
         // 绘制文本
+        log("绘制文本")
         let textRect = NSRect(
             x: padding,
             y: padding,
@@ -104,6 +122,7 @@ class ImageGenerator {
         attributedString.draw(in: textRect)
 
         image.unlockFocus()
+        log("图片绘制完成")
 
         return image
     }

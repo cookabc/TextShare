@@ -125,4 +125,13 @@ class PopupWindow: NSWindow {
             }
         }
     }
+
+    // 安全关闭方法
+    func safeClose() {
+        DispatchQueue.main.async {
+            if self.isVisible {
+                self.orderOut(nil)
+            }
+        }
+    }
 }

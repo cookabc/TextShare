@@ -1,17 +1,46 @@
 import Cocoa
+import Foundation
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popupWindow: PopupWindow?
 
+    // 日志功能
+    private func log(_ message: String) {
+        let timestamp = DateFormatter()
+        timestamp.dateFormat = "HH:mm:ss"
+        print("[\(timestamp.string(from: Date()))] \(message)")
+        fflush(stdout)  // 立即输出到终端
+    }
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        log("应用启动完成")
         setupStatusBarItem()
+        log("菜单栏图标设置完成")
         setupGlobalHotKey()
+        log("全局快捷键设置完成")
         // 不创建主窗口，只作为后台应用运行
+        log("应用初始化完成，开始运行")
+
+        // 设置应用不自动退出
+        NSApp.setActivationPolicy(.accessory)
+
+        // 创建一个计时器来保持应用活跃
+        let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            // 每10秒记录一次心跳
+            self.log("应用心跳 - 确认应用仍在运行")
+        }
+        RunLoop.current.add(timer, forMode: .common)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        log("应用即将退出")
         // 清理资源
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        log("系统请求终止应用")
+        return .terminateNow
     }
 
     private func setupStatusBarItem() {
@@ -40,25 +69,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func generateImage(_ sender: Any?) {
+        log("快捷键触发，开始生成分享图")
+
         let clipboard = NSPasteboard.general
         guard let text = clipboard.string(forType: .string), !text.isEmpty else {
+            log("剪贴板中没有文本内容")
             return  // 简单返回，不显示警告
         }
 
+        log("从剪贴板获取到文本: \(text.prefix(50))...")
+
         let generator = ImageGenerator()
+        log("开始生成图片")
+
         if let image = generator.generateImage(from: text, theme: .light) {
+            log("图片生成成功，尺寸: \(image.size)")
+
             let popupWindow = PopupWindow(image: image, text: text)
+            log("创建预览窗口")
             popupWindow.makeKeyAndOrderFront(nil)
+            log("显示预览窗口")
 
             // 将图片复制到剪贴板
             let imagePasteboard = NSPasteboard.general
             imagePasteboard.clearContents()
-            imagePasteboard.writeObjects([image])
+            let success = imagePasteboard.writeObjects([image])
+            log("图片复制到剪贴板: \(success ? "成功" : "失败")")
 
             // 3秒后自动关闭窗口
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                popupWindow.close()
+                self.log("开始关闭预览窗口")
+                popupWindow.safeClose()
+                self.log("预览窗口已关闭")
             }
+        } else {
+            log("图片生成失败")
         }
     }
 
