@@ -1,0 +1,26 @@
+# Build files
+build/
+*.o
+TextToShare
+
+# Xcode files
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+DerivedData/
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift files
+*.swiftpm/
+.build/
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
