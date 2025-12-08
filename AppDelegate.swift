@@ -1,9 +1,11 @@
 import Cocoa
 import Foundation
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
-    private var popupWindow: PopupWindow?
+    private var currentPopupWindow: PopupWindow?
+    private var autoCloseTimer: Timer?
+    private let imageGenerator = ImageGenerator()
 
     // 日志功能
     private func log(_ message: String) {
@@ -26,9 +28,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         // 创建一个计时器来保持应用活跃
-        let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             // 每10秒记录一次心跳
-            self.log("应用心跳 - 确认应用仍在运行")
+            self?.log("应用心跳 - 确认应用仍在运行")
         }
         RunLoop.current.add(timer, forMode: .common)
     }
@@ -71,6 +73,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func generateImage(_ sender: Any?) {
         log("快捷键触发，开始生成分享图")
 
+        // 取消之前的自动关闭计时器
+        autoCloseTimer?.invalidate()
+        autoCloseTimer = nil
+
         let clipboard = NSPasteboard.general
         guard let text = clipboard.string(forType: .string), !text.isEmpty else {
             log("剪贴板中没有文本内容")
@@ -78,16 +84,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         log("从剪贴板获取到文本: \(text.prefix(50))...")
-
-        let generator = ImageGenerator()
         log("开始生成图片")
 
-        if let image = generator.generateImage(from: text, theme: .light) {
+        if let image = imageGenerator.generateImage(from: text, theme: .light) {
             log("图片生成成功，尺寸: \(image.size)")
 
-            let popupWindow = PopupWindow(image: image, text: text)
+            currentPopupWindow = PopupWindow(image: image, text: text)
+            currentPopupWindow?.delegate = self
             log("创建预览窗口")
-            popupWindow.makeKeyAndOrderFront(nil)
+            currentPopupWindow?.makeKeyAndOrderFront(nil)
             log("显示预览窗口")
 
             // 将图片复制到剪贴板
@@ -97,13 +102,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             log("图片复制到剪贴板: \(success ? "成功" : "失败")")
 
             // 3秒后自动关闭窗口
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                self.log("开始关闭预览窗口")
-                popupWindow.safeClose()
-                self.log("预览窗口已关闭")
+            autoCloseTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+                self?.log("开始关闭预览窗口")
+                self?.currentPopupWindow?.safeClose()
+                self?.currentPopupWindow = nil
+                self?.autoCloseTimer = nil
+                self?.log("预览窗口已关闭")
             }
         } else {
             log("图片生成失败")
+        }
+    }
+
+    // MARK: - NSWindowDelegate
+    func windowWillClose(_ notification: Notification) {
+        if let window = notification.object as? NSWindow, window == currentPopupWindow {
+            log("用户手动关闭预览窗口")
+            autoCloseTimer?.invalidate()
+            autoCloseTimer = nil
+            currentPopupWindow = nil
         }
     }
 
