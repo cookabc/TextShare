@@ -2,10 +2,7 @@ import Cocoa
 import Foundation
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private var statusItem: NSStatusItem?
-    private var currentPopupWindow: PopupWindow?
-    private var autoCloseTimer: Timer?
-    private let imageGenerator = ImageGenerator()
+    private var heartbeatTimer: Timer?
 
     // 日志功能
     private func log(_ message: String) {
@@ -17,10 +14,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         log("应用启动完成")
-        setupStatusBarItem()
+
+        // 设置各个管理器
+        StatusBarManager.shared.setup(onGenerateImage: { [weak self] in
+            self?.generateImage()
+        })
         log("菜单栏图标设置完成")
-        setupGlobalHotKey()
+
+        HotkeyManager.shared.setup(onHotkeyPressed: { [weak self] in
+            self?.generateImage()
+        })
         log("全局快捷键设置完成")
+
         // 不创建主窗口，只作为后台应用运行
         log("应用初始化完成，开始运行")
 
@@ -28,16 +33,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         // 创建一个计时器来保持应用活跃
-        let timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             // 每10秒记录一次心跳
             self?.log("应用心跳 - 确认应用仍在运行")
         }
-        RunLoop.current.add(timer, forMode: .common)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
         log("应用即将退出")
         // 清理资源
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+
+        // 清理各个管理器
+        StatusBarManager.shared.cleanup()
+        HotkeyManager.shared.cleanup()
+        PopupWindowManager.shared.cleanup()
+
+        log("所有资源已清理")
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -45,55 +58,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return .terminateNow
     }
 
-    private func setupStatusBarItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem?.button?.title = "📝"
-        statusItem?.button?.toolTip = "文字分享图生成器"
-
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "生成分享图 (⌘⇧C)", action: #selector(generateImage), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        statusItem?.menu = menu
-    }
-
-  private func setupGlobalHotKey() {
-        // 仅在应用内监听快捷键，避免权限问题
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if event.modifierFlags.contains([.command, .shift]) && event.keyCode == 8 { // 8是C键的键码
-                DispatchQueue.main.async {
-                    self.generateImage(nil)
-                }
-            }
-            return event
-        }
-    }
-
-    @objc private func generateImage(_ sender: Any?) {
+    @objc private func generateImage() {
         log("快捷键触发，开始生成分享图")
-
-        // 取消之前的自动关闭计时器
-        autoCloseTimer?.invalidate()
-        autoCloseTimer = nil
 
         let clipboard = NSPasteboard.general
         guard let text = clipboard.string(forType: .string), !text.isEmpty else {
             log("剪贴板中没有文本内容")
-            return  // 简单返回，不显示警告
+            showClipboardEmptyNotification()
+            return
         }
 
         log("从剪贴板获取到文本: \(text.prefix(50))...")
         log("开始生成图片")
 
-        if let image = imageGenerator.generateImage(from: text, theme: .light) {
+        if let image = ImageGenerator.shared.generateImage(from: text, theme: .light) {
             log("图片生成成功，尺寸: \(image.size)")
-
-            currentPopupWindow = PopupWindow(image: image, text: text)
-            currentPopupWindow?.delegate = self
-            log("创建预览窗口")
-            currentPopupWindow?.makeKeyAndOrderFront(nil)
-            log("显示预览窗口")
 
             // 将图片复制到剪贴板
             let imagePasteboard = NSPasteboard.general
@@ -101,14 +80,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let success = imagePasteboard.writeObjects([image])
             log("图片复制到剪贴板: \(success ? "成功" : "失败")")
 
-            // 3秒后自动关闭窗口
-            autoCloseTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
-                self?.log("开始关闭预览窗口")
-                self?.currentPopupWindow?.safeClose()
-                self?.currentPopupWindow = nil
-                self?.autoCloseTimer = nil
-                self?.log("预览窗口已关闭")
-            }
+            // 显示预览窗口
+            PopupWindowManager.shared.showPopup(with: image, text: text)
         } else {
             log("图片生成失败")
         }
@@ -116,11 +89,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // MARK: - NSWindowDelegate
     func windowWillClose(_ notification: Notification) {
-        if let window = notification.object as? NSWindow, window == currentPopupWindow {
-            log("用户手动关闭预览窗口")
-            autoCloseTimer?.invalidate()
-            autoCloseTimer = nil
-            currentPopupWindow = nil
+        if let window = notification.object as? NSWindow {
+            PopupWindowManager.shared.windowWillClose(window)
+        }
+    }
+
+    private func showClipboardEmptyNotification() {
+        let alert = NSAlert()
+        alert.messageText = "剪贴板为空"
+        alert.informativeText = "请先复制一些文本，然后按 ⌘⇧C 生成分享图。"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "确定")
+
+        // 显示通知但不阻塞主线程
+        DispatchQueue.main.async {
+            alert.runModal()
         }
     }
 
