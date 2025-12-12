@@ -107,6 +107,9 @@ struct MainContentFeature {
 // MARK: - Generate Feature
 @Reducer
 struct GenerateFeature {
+    @Dependency(\.imageGenerator) var imageGenerator
+    @Dependency(\.imageFileManager) var imageFileManager
+
     struct State: Equatable {
         var text = ""
         var isGenerating = false
@@ -123,6 +126,8 @@ struct GenerateFeature {
         case clearError
         case clearContent
         case exportImage
+        case updateConfiguration(ExportConfiguration)
+        case saveToHistory
     }
 
     var body: some Reducer<State, Action> {
@@ -135,7 +140,7 @@ struct GenerateFeature {
 
             case .generateImage:
                 guard !state.text.isEmpty else {
-                    state.error = "Please enter some text first"
+                    state.error = "请输入一些文本"
                     return .none
                 }
 
@@ -143,15 +148,15 @@ struct GenerateFeature {
                 state.error = nil
 
                 return .run { send in
-                    // This will be implemented in Step 4: Image Generation Migration
-                    // For now, simulate async image generation
-                    try await Task.sleep(nanoseconds: 2_000_000_000)
-
-                    // Create a simple test image for Step 3
-                    let testImageData = await createTestImageData(for: state.text)
-                    await send(.imageGenerated(testImageData))
-                } catch: { error, send in
-                    await send(.generateFailed(error.localizedDescription))
+                    do {
+                        let imageData = try await imageGenerator.generateImage(
+                            from: state.text,
+                            with: state.currentConfig
+                        )
+                        await send(.imageGenerated(imageData))
+                    } catch {
+                        await send(.generateFailed(error.localizedDescription))
+                    }
                 }
                 .cancellable(id: "image-generation")
 
@@ -176,16 +181,56 @@ struct GenerateFeature {
                 return .none
 
             case .exportImage:
-                // This will be implemented in Step 4: Image Generation Migration
-                // For now, just log the export request
-                print("Export requested for generated image")
+                guard let imageData = state.generatedImage else {
+                    state.error = "没有可导出的图片"
+                    return .none
+                }
+
+                return .run { send in
+                    await exportImage(imageData)
+                }
+
+            case .updateConfiguration(let config):
+                state.currentConfig = config
                 return .none
+
+            case .saveToHistory:
+                guard let imageData = state.generatedImage else {
+                    state.error = "没有可保存的图片"
+                    return .none
+                }
+
+                let historyItem = HistoryItemData(
+                    text: state.text,
+                    imageData: imageData,
+                    configuration: state.currentConfig
+                )
+
+                return .run { send in
+                    do {
+                        try await imageFileManager.saveHistoryItem(historyItem)
+                    } catch {
+                        // Handle error silently for now, or could send an error action
+                        print("Failed to save to history: \(error)")
+                    }
+                }
             }
         }
     }
 }
 
 // MARK: - Helper Functions
+private func exportImage(_ imageData: Data) async {
+    let imageFileManager = ImageFileManager.shared
+
+    do {
+        _ = try await imageFileManager.exportWithSaveDialog(imageData)
+    } catch {
+        print("Failed to export image: \(error)")
+    }
+}
+
+// Legacy helper function (kept for compatibility)
 private func createTestImageData(for text: String) async -> Data {
     await Task.detached {
         let size = NSSize(width: 400, height: 200)
@@ -222,9 +267,13 @@ private func createTestImageData(for text: String) async -> Data {
 // MARK: - History Feature
 @Reducer
 struct HistoryFeature {
+    @Dependency(\.imageFileManager) var imageFileManager
+
     struct State: Equatable {
         var items: [HistoryItem] = []
         var currentFilter: Filter = .all
+        var isLoading = false
+        var error: String?
     }
 
     enum Filter: String, CaseIterable, Equatable {
@@ -254,32 +303,79 @@ struct HistoryFeature {
         let text: String
         let imageData: Data
         let createdAt: Date
-        let isFavorite: Bool = false
+        let configuration: ExportConfiguration
+        let isFavorite: Bool
+
+        init(from data: HistoryItemData) {
+            self.id = data.id
+            self.text = data.text
+            self.imageData = data.imageData
+            self.createdAt = data.createdAt
+            self.configuration = data.configuration
+            self.isFavorite = data.isFavorite
+        }
     }
 
     enum Action {
+        case loadHistory
         case addItem(HistoryItem)
         case removeItem(ID)
         case clearAll
         case setFilter(Filter)
         case regenerateFromItem(HistoryItem)
         case toggleFavorite(ID)
+        case historyLoaded([HistoryItemData])
+        case historyLoadFailed(String)
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            case .loadHistory:
+                state.isLoading = true
+                state.error = nil
+                return .run { send in
+                    do {
+                        let historyData = try await imageFileManager.loadHistory()
+                        await send(.historyLoaded(historyData.items))
+                    } catch {
+                        await send(.historyLoadFailed(error.localizedDescription))
+                    }
+                }
+
+            case .historyLoaded(let historyItems):
+                state.isLoading = false
+                state.items = historyItems.map { HistoryItem(from: $0) }
+                return .none
+
+            case .historyLoadFailed(let errorMessage):
+                state.isLoading = false
+                state.error = errorMessage
+                return .none
+
             case .addItem(let item):
                 state.items.insert(item, at: 0)
                 return .none
 
             case .removeItem(let id):
                 state.items.removeAll { $0.id == id }
-                return .none
+                return .run { send in
+                    do {
+                        try await imageFileManager.removeFromHistory(id: id)
+                    } catch {
+                        print("Failed to remove from history: \(error)")
+                    }
+                }
 
             case .clearAll:
                 state.items.removeAll()
-                return .none
+                return .run { send in
+                    do {
+                        try await imageFileManager.clearHistory()
+                    } catch {
+                        print("Failed to clear history: \(error)")
+                    }
+                }
 
             case .setFilter(let filter):
                 state.currentFilter = filter
