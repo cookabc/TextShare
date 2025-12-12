@@ -5,6 +5,7 @@ class StatusBarManager {
 
     private var statusItem: NSStatusItem?
     private var onGenerateImage: (() -> Void)?
+    private var settingsWindow: SettingsWindow?
 
     private init() {}
 
@@ -18,6 +19,8 @@ class StatusBarManager {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "生成分享图 (⌘⇧C)", action: #selector(generateImage), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "设置", action: #selector(showSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem?.menu = menu
@@ -27,7 +30,24 @@ class StatusBarManager {
         onGenerateImage?()
     }
 
+    @objc private func showSettings() {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindow(
+                contentRect: NSRect.zero,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+        }
+
+        settingsWindow?.center()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func cleanup() {
+        settingsWindow?.close()
+        settingsWindow = nil
         statusItem = nil
     }
 }

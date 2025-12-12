@@ -15,6 +15,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         log("应用启动完成")
 
+        // 初始化配置
+        FontConfig.shared.loadConfig()
+        log("字体配置加载完成")
+
         // 设置各个管理器
         StatusBarManager.shared.setup(onGenerateImage: { [weak self] in
             self?.generateImage()
