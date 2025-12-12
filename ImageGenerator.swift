@@ -80,7 +80,14 @@ class ImageGenerator {
     }
 
     func generateImage(from text: String, theme: Theme) -> NSImage? {
-        let key = cacheKey(for: text, theme: theme)
+        let config = FontConfig.shared.getCurrentConfig()
+        return generateImage(from: text, theme: theme, config: config)
+    }
+
+    func generateImage(from text: String, theme: Theme, config: FontConfig.ExportConfig) -> NSImage? {
+        // 生成缓存键
+        let cacheString = "\(text.hashValue)_\(theme.hashValue)_\(config.fontFamily.rawValue)_\(config.fontSize.rawValue)_\(config.padding)_\(config.maxWidth)_\(config.watermark ?? "nil")"
+        let key = cacheString as NSString
 
         // 先检查缓存
         if let cachedImage = imageCache.object(forKey: key) {
@@ -88,34 +95,39 @@ class ImageGenerator {
             return cachedImage
         }
 
-        log("开始生成图片，文本长度: \(text.count), 主题: \(theme)")
+        log("开始生成图片，文本长度: \(text.count), 主题: \(theme), 字体: \(config.fontFamily.displayName)")
 
-        let config = ThemeConfig.config(for: theme)
+        // 文本长度验证
+        if text.count > 5000 {
+            log("文本过长：\(text.count) 个字符")
+            return nil
+        }
 
-        // 设置字体和样式
-        let font = NSFont.systemFont(ofSize: 24, weight: .medium)
+        let themeConfig = ThemeConfig.config(for: theme)
+
+        // 使用配置的字体
+        let font = FontConfig.shared.getFont()
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .left
-        paragraphStyle.lineSpacing = 8
+        paragraphStyle.lineSpacing = config.fontSize.rawValue * 0.3
 
         log("设置字体和样式完成")
 
         // 计算文本尺寸
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: config.textColor,
+            .foregroundColor: themeConfig.textColor,
             .paragraphStyle: paragraphStyle
         ]
 
         let attributedString = NSAttributedString(string: text, attributes: attributes)
-        let textSize = attributedString.boundingRect(with: NSSize(width: 600, height: CGFloat.greatestFiniteMagnitude), options: .usesLineFragmentOrigin)
+        let textSize = attributedString.boundingRect(with: NSSize(width: config.maxWidth, height: CGFloat.greatestFiniteMagnitude), options: .usesLineFragmentOrigin)
         log("计算文本尺寸完成: \(textSize)")
 
-        // 计算最终图片尺寸（添加内边距）
-        let padding: CGFloat = 40
+        // 计算最终图片尺寸（使用配置的内边距）
         let imageSize = NSSize(
-            width: max(400, textSize.width + padding * 2),
-            height: max(200, textSize.height + padding * 2)
+            width: max(400, textSize.width + config.padding * 2),
+            height: max(200, textSize.height + config.padding * 2)
         )
         log("最终图片尺寸: \(imageSize)")
 
@@ -132,10 +144,13 @@ class ImageGenerator {
         return image
     }
 
-    private func createImage(for text: String, with attributedString: NSAttributedString, size imageSize: NSSize, theme: Theme, config: ThemeConfig) -> NSImage? {
+    private func createImage(for text: String, with attributedString: NSAttributedString, size imageSize: NSSize, theme: Theme, config: FontConfig.ExportConfig) -> NSImage? {
         let image = NSImage(size: imageSize)
         image.lockFocus()
         log("开始绘制图片")
+
+        let themeConfig = ThemeConfig.config(for: theme)
+        let cornerRadius = themeConfig.cornerRadius
 
         // 绘制背景
         let rect = NSRect(origin: .zero, size: imageSize)
@@ -151,27 +166,45 @@ class ImageGenerator {
         } else {
             // 绘制纯色背景
             log("绘制纯色背景")
-            config.backgroundColor.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: config.cornerRadius, yRadius: config.cornerRadius).fill()
+            themeConfig.backgroundColor.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
         }
 
         // 绘制边框
-        if let borderColor = config.borderColor {
+        if let borderColor = themeConfig.borderColor {
             log("绘制边框")
             borderColor.setStroke()
-            NSBezierPath(roundedRect: rect, xRadius: config.cornerRadius, yRadius: config.cornerRadius).stroke()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).stroke()
         }
 
         // 绘制文本
         log("绘制文本")
-        let padding: CGFloat = 40
         let textRect = NSRect(
-            x: padding,
-            y: padding,
-            width: imageSize.width - padding * 2,
-            height: imageSize.height - padding * 2
+            x: config.padding,
+            y: config.padding,
+            width: imageSize.width - config.padding * 2,
+            height: imageSize.height - config.padding * 2
         )
         attributedString.draw(in: textRect)
+
+        // 绘制水印
+        if let watermark = config.watermark, !watermark.isEmpty {
+            log("绘制水印")
+            let watermarkAttributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 12),
+                .foregroundColor: NSColor.gray.withAlphaComponent(0.6)
+            ]
+
+            let watermarkString = NSAttributedString(string: watermark, attributes: watermarkAttributes)
+            let watermarkSize = watermarkString.size()
+            let watermarkRect = NSRect(
+                x: imageSize.width - watermarkSize.width - 10,
+                y: 10,
+                width: watermarkSize.width,
+                height: watermarkSize.height
+            )
+            watermarkString.draw(in: watermarkRect)
+        }
 
         image.unlockFocus()
         log("图片绘制完成")
