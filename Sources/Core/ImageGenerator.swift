@@ -124,6 +124,10 @@ actor ImageGenerator {
 
     // MARK: - Background Drawing
     private func drawBackground(rect: NSRect, configuration: ExportConfiguration) throws {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            throw ImageGenerationError.contextCreationFailed
+        }
+
         let path = CGMutablePath()
 
         // Calculate corner radius
@@ -137,13 +141,15 @@ actor ImageGenerator {
         )
 
         // Fill background
-        context?.setFillColor(configuration.theme.primaryColor.cgColor)
-        context?.addPath(path)
-        context?.fillPath()
+        context.setFillColor(configuration.theme.primaryColor.cgColor)
+        context.addPath(path)
+        context.fillPath()
     }
 
     // MARK: - Border Drawing
     private func drawBorder(rect: NSRect, configuration: ExportConfiguration) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+
         let cornerRadius = min(configuration.cornerRadius, min(rect.width, rect.height) / 2)
         let borderRect = rect.insetBy(dx: configuration.borderWidth / 2, dy: configuration.borderWidth / 2)
 
@@ -154,10 +160,10 @@ actor ImageGenerator {
             cornerHeight: cornerRadius
         )
 
-        context?.setStrokeColor(configuration.theme.accentColor.cgColor)
-        context?.setLineWidth(configuration.borderWidth)
-        context?.addPath(path)
-        context?.strokePath()
+        context.setStrokeColor(configuration.theme.accentColor.cgColor)
+        context.setLineWidth(configuration.borderWidth)
+        context.addPath(path)
+        context.strokePath()
     }
 
     // MARK: - Text Bounds Calculation
