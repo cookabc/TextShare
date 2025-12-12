@@ -102,51 +102,7 @@ struct MainContentView: View {
     }
 }
 
-// Placeholder views - we'll implement these in subsequent steps
-struct GenerateContentView: View {
-    let store: StoreOf<GenerateFeature.State>
-
-    var body: some View {
-        WithViewStore(store) { viewStore in
-            VStack {
-                Text("Generate Content View")
-                    .font(.title2)
-                Text("This will be implemented in the next step")
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-        }
-    }
-}
-
-struct HistoryContentView: View {
-    let store: StoreOf<HistoryFeature.State>
-
-    var body: some View {
-        WithViewStore(store) { viewStore in
-            VStack {
-                Text("History Content View")
-                    .font(.title2)
-                Text("Translation history and favorites")
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-        }
-    }
-}
-
-struct SettingsContentView: View {
-    let store: StoreOf<SettingsFeature.State>
-
-    var body: some View {
-        WithViewStore(store) { viewStore in
-            VStack {
-                Text("Settings Content View")
-                    .font(.title2)
-                Text("Font, theme, and configuration settings")
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-        }
-    }
-}
+// Modern SwiftUI Views
+typealias GenerateContentView = GenerateView
+typealias HistoryContentView = HistoryView
+typealias SettingsContentView = ModernSettingsView
