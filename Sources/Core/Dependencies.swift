@@ -27,6 +27,18 @@ struct FontMetricsCalculatorKey: DependencyKey {
     }
 }
 
+struct ImageGeneratorKey: DependencyKey {
+    var liveValue: ImageGenerator {
+        ImageGenerator.shared
+    }
+}
+
+struct ImageFileManagerKey: DependencyKey {
+    var liveValue: ImageFileManager {
+        ImageFileManager.shared
+    }
+}
+
 // MARK: - Test Dependencies (for future unit testing)
 extension FontConfigManagerKey: TestDependencyKey {
     var testValue: ModernFontConfigurationManager {
@@ -49,6 +61,18 @@ extension FontPreviewGeneratorKey: TestDependencyKey {
 extension FontMetricsCalculatorKey: TestDependencyKey {
     var testValue: FontMetricsCalculator {
         MockFontMetricsCalculator()
+    }
+}
+
+extension ImageGeneratorKey: TestDependencyKey {
+    var testValue: ImageGenerator {
+        MockImageGenerator()
+    }
+}
+
+extension ImageFileManagerKey: TestDependencyKey {
+    var testValue: ImageFileManager {
+        MockImageFileManager()
     }
 }
 
@@ -89,6 +113,27 @@ class MockFontMetricsCalculator: FontMetricsCalculator {
         font: NSFont
     ) async -> CGSize {
         return CGSize(width: 400, height: 200)
+    }
+}
+
+class MockImageGenerator: ImageGenerator {
+    override func generateImage(
+        from text: String,
+        with configuration: ExportConfiguration
+    ) async throws -> Data {
+        // Return a simple test image data
+        return Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) // PNG header
+    }
+}
+
+class MockImageFileManager: ImageFileManager {
+    override func exportWithSaveDialog(_ imageData: Data) async throws -> URL? {
+        // Mock implementation - just return nil
+        return nil
+    }
+
+    override func saveHistoryItem(_ item: HistoryItemData) async throws {
+        // Mock implementation - do nothing
     }
 }
 

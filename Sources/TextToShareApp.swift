@@ -11,6 +11,8 @@ struct TextToShareApp: App {
         FontServiceKey.liveValue
         FontPreviewGeneratorKey.liveValue
         FontMetricsCalculatorKey.liveValue
+        ImageGeneratorKey.liveValue
+        ImageFileManagerKey.liveValue
     }
 }
 
