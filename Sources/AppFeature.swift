@@ -112,6 +112,7 @@ struct GenerateFeature {
         var isGenerating = false
         var generatedImage: Data?
         var error: String?
+        var currentConfig = ExportConfiguration.default
     }
 
     enum Action {
@@ -120,6 +121,8 @@ struct GenerateFeature {
         case imageGenerated(Data)
         case generateFailed(String)
         case clearError
+        case clearContent
+        case exportImage
     }
 
     var body: some Reducer<State, Action> {
@@ -139,15 +142,14 @@ struct GenerateFeature {
                 state.isGenerating = true
                 state.error = nil
 
-                // This will be implemented in a later step
-                // For now, simulate image generation
                 return .run { send in
-                    // Simulate async image generation
-                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    // This will be implemented in Step 4: Image Generation Migration
+                    // For now, simulate async image generation
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
 
-                    // Mock image data (placeholder)
-                    let mockImageData = Data()
-                    await send(.imageGenerated(mockImageData))
+                    // Create a simple test image for Step 3
+                    let testImageData = await createTestImageData(for: state.text)
+                    await send(.imageGenerated(testImageData))
                 } catch: { error, send in
                     await send(.generateFailed(error.localizedDescription))
                 }
@@ -166,9 +168,55 @@ struct GenerateFeature {
             case .clearError:
                 state.error = nil
                 return .none
+
+            case .clearContent:
+                state.text = ""
+                state.generatedImage = nil
+                state.error = nil
+                return .none
+
+            case .exportImage:
+                // This will be implemented in Step 4: Image Generation Migration
+                // For now, just log the export request
+                print("Export requested for generated image")
+                return .none
             }
         }
     }
+}
+
+// MARK: - Helper Functions
+private func createTestImageData(for text: String) async -> Data {
+    await Task.detached {
+        let size = NSSize(width: 400, height: 200)
+        let image = NSImage(size: size)
+
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        // Create a simple background
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: size).fill()
+
+        // Draw text
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 16),
+            .foregroundColor: NSColor.black
+        ]
+
+        let attributedString = NSAttributedString(string: text, attributes: attributes)
+        let textRect = NSRect(x: 20, y: size.height/2 - 10, width: size.width - 40, height: 20)
+        attributedString.draw(in: textRect)
+
+        // Convert to data
+        guard let tiffData = image.tiffRepresentation,
+              let bitmapImage = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmapImage.representation(using: .png, properties: [:]) else {
+            return Data()
+        }
+
+        return pngData
+    }.value
 }
 
 // MARK: - History Feature
@@ -176,6 +224,29 @@ struct GenerateFeature {
 struct HistoryFeature {
     struct State: Equatable {
         var items: [HistoryItem] = []
+        var currentFilter: Filter = .all
+    }
+
+    enum Filter: String, CaseIterable, Equatable {
+        case all = "all"
+        case recent = "recent"
+        case favorites = "favorites"
+
+        var localizedName: String {
+            switch self {
+            case .all: return "全部"
+            case .recent: return "最近"
+            case .favorites: return "收藏"
+            }
+        }
+
+        var iconName: String {
+            switch self {
+            case .all: return "list.bullet"
+            case .recent: return "clock"
+            case .favorites: return "heart"
+            }
+        }
     }
 
     struct HistoryItem: Equatable, Identifiable {
@@ -183,12 +254,16 @@ struct HistoryFeature {
         let text: String
         let imageData: Data
         let createdAt: Date
+        let isFavorite: Bool = false
     }
 
     enum Action {
         case addItem(HistoryItem)
         case removeItem(ID)
         case clearAll
+        case setFilter(Filter)
+        case regenerateFromItem(HistoryItem)
+        case toggleFavorite(ID)
     }
 
     var body: some Reducer<State, Action> {
@@ -205,7 +280,35 @@ struct HistoryFeature {
             case .clearAll:
                 state.items.removeAll()
                 return .none
+
+            case .setFilter(let filter):
+                state.currentFilter = filter
+                return .none
+
+            case .regenerateFromItem(let item):
+                // This will be handled by parent feature
+                return .none
+
+            case .toggleFavorite(let id):
+                // In a real implementation, we'd toggle the favorite status
+                // For now, just log the action
+                return .none
             }
+        }
+    }
+}
+
+// MARK: - History Feature Extensions
+extension HistoryFeature.State {
+    func filteredItems(for filter: HistoryFeature.State.Filter) -> [HistoryFeature.State.HistoryItem] {
+        switch filter {
+        case .all:
+            return items
+        case .recent:
+            let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+            return items.filter { $0.createdAt >= oneDayAgo }
+        case .favorites:
+            return items.filter { $0.isFavorite }
         }
     }
 }
@@ -246,6 +349,7 @@ struct SettingsFeature {
         case addToFavorites(ExportConfiguration)
         case removeFromFavorites(ExportConfiguration)
         case validateConfiguration
+        case setValidationErrors([ConfigurationError])
         case resetToDefault
         case clearRecentConfigs
         case toggleAdvancedOptions
