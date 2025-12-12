@@ -1,9 +1,62 @@
 import Foundation
 
-// MARK: - Export Configuration Extensions
-// Adding Codable support for ExportConfiguration
+// MARK: - Export Configuration Base Structure
+// Modern Swift configuration with type safety and validation
 
-extension ExportConfiguration: Codable {
+struct ExportConfiguration: Equatable, Codable {
+    var fontFamily: ModernFontFamily = .system
+    var fontSize: ModernFontSize = .medium
+    var theme: ModernTheme = .light
+    var padding: Double = 32
+    var maxWidth: Double = 800
+    var lineHeight: Double = 1.4
+    var watermark: String?
+    var cornerRadius: Double = 12
+    var borderWidth: Double = 0
+}
+
+extension ExportConfiguration {
+    static let `default` = ExportConfiguration()
+
+    func with(fontFamily: ModernFontFamily) -> ExportConfiguration {
+        var config = self
+        config.fontFamily = fontFamily
+        return config
+    }
+
+    func with(fontSize: ModernFontSize) -> ExportConfiguration {
+        var config = self
+        config.fontSize = fontSize
+        return config
+    }
+
+    func with(theme: ModernTheme) -> ExportConfiguration {
+        var config = self
+        config.theme = theme
+        return config
+    }
+
+    func with(padding: Double) -> ExportConfiguration {
+        var config = self
+        config.padding = padding
+        return config
+    }
+
+    func with(maxWidth: Double) -> ExportConfiguration {
+        var config = self
+        config.maxWidth = maxWidth
+        return config
+    }
+
+    func with(watermark: String?) -> ExportConfiguration {
+        var config = self
+        config.watermark = watermark
+        return config
+    }
+}
+
+// MARK: - Codable Support Implementation
+extension ExportConfiguration {
     enum CodingKeys: String, CodingKey {
         case fontFamily, fontSize, theme, padding, maxWidth, lineHeight, watermark, cornerRadius, borderWidth
     }

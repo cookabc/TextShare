@@ -14,7 +14,6 @@ struct TextToShareApp: App {
         ImageGeneratorKey.liveValue
         ImageFileManagerKey.liveValue
     }
-}
 
     var body: some Scene {
         WindowGroup {
@@ -100,6 +99,9 @@ struct MainContentView: View {
             case .settings:
                 SettingsContentView(store: store.scope(state: \.settings, action: MainContentFeature.Action.settings))
             }
+        }
+        .onAppear {
+            // Load history when history tab is first accessed
         }
     }
 }
