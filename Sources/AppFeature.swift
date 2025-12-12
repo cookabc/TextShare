@@ -210,105 +210,162 @@ struct HistoryFeature {
     }
 }
 
-// MARK: - Settings Feature
+// MARK: - Settings Feature (Modern)
 @Reducer
 struct SettingsFeature {
+    @Dependency(\.fontConfigManager) var fontConfigManager
+
     struct State: Equatable {
-        var fontFamily = FontFamily.system
-        var fontSize = FontSize.medium
-        var theme = Theme.light
-        var padding: Double = 40
-        var maxWidth: Double = 600
-        var watermark: String?
-    }
+        var currentConfig = ExportConfiguration.default
+        var recentConfigs: [ExportConfiguration] = []
+        var favoriteConfigs: [ExportConfiguration] = []
+        var isLoading = false
+        var validationErrors: [ConfigurationError] = []
+        var selectedPreset: ExportConfigurationPreset = .default
 
-    enum FontFamily: String, CaseIterable, Equatable {
-        case system = "System"
-        case avenir = "Avenir"
-        case helvetica = "Helvetica Neue"
-        case menlo = "Menlo"
-        case monaco = "Monaco"
-
-        var displayName: String {
-            switch self {
-            case .system: return "System"
-            case .avenir: return "Avenir"
-            case .helvetica: return "Helvetica Neue"
-            case .menlo: return "Menlo"
-            case .monaco: return "Monaco"
-            }
-        }
-    }
-
-    enum FontSize: Int, CaseIterable, Equatable {
-        case small = 16
-        case medium = 20
-        case large = 24
-        case extraLarge = 32
-
-        var displayName: String {
-            switch self {
-            case .small: return "Small"
-            case .medium: return "Medium"
-            case .large: return "Large"
-            case .extraLarge: return "Extra Large"
-            }
-        }
-    }
-
-    enum Theme: String, CaseIterable, Equatable {
-        case light = "light"
-        case dark = "dark"
-        case gradient = "gradient"
-
-        var displayName: String {
-            switch self {
-            case .light: return "Light"
-            case .dark: return "Dark"
-            case .gradient: return "Gradient"
-            }
-        }
+        // UI State
+        var showAdvancedOptions = false
+        var selectedFontFamily: ModernFontFamily = .system
+        var selectedFontSize: ModernFontSize = .medium
+        var selectedTheme: ModernTheme = .light
     }
 
     enum Action {
-        case updateFontFamily(FontFamily)
-        case updateFontSize(FontSize)
-        case updateTheme(Theme)
+        case loadConfiguration
+        case updateConfiguration(ExportConfiguration)
+        case updateFontFamily(ModernFontFamily)
+        case updateFontSize(ModernFontSize)
+        case updateTheme(ModernTheme)
         case updatePadding(Double)
         case updateMaxWidth(Double)
+        case updateLineHeight(Double)
         case updateWatermark(String?)
-        case saveSettings
+        case updateCornerRadius(Double)
+        case updateBorderWidth(Double)
+        case applyPreset(ExportConfigurationPreset)
+        case addToFavorites(ExportConfiguration)
+        case removeFromFavorites(ExportConfiguration)
+        case validateConfiguration
+        case resetToDefault
+        case clearRecentConfigs
+        case toggleAdvancedOptions
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
-            case .updateFontFamily(let fontFamily):
-                state.fontFamily = fontFamily
+            case .loadConfiguration:
+                state.currentConfig = fontConfigManager.currentConfig
+                state.recentConfigs = fontConfigManager.recentConfigs
+                state.favoriteConfigs = fontConfigManager.favoriteConfigs
+                state.selectedFontFamily = state.currentConfig.fontFamily
+                state.selectedFontSize = state.currentConfig.fontSize
+                state.selectedTheme = state.currentConfig.theme
                 return .none
+
+            case .updateConfiguration(let config):
+                state.currentConfig = config
+                state.selectedFontFamily = config.fontFamily
+                state.selectedFontSize = config.fontSize
+                state.selectedTheme = config.theme
+                return .run { send in
+                    await fontConfigManager.updateConfiguration(config)
+                }
+
+            case .updateFontFamily(let fontFamily):
+                state.selectedFontFamily = fontFamily
+                let newConfig = state.currentConfig.with(fontFamily: fontFamily)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
 
             case .updateFontSize(let fontSize):
-                state.fontSize = fontSize
-                return .none
+                state.selectedFontSize = fontSize
+                let newConfig = state.currentConfig.with(fontSize: fontSize)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
 
             case .updateTheme(let theme):
-                state.theme = theme
-                return .none
+                state.selectedTheme = theme
+                let newConfig = state.currentConfig.with(theme: theme)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
 
             case .updatePadding(let padding):
-                state.padding = padding
-                return .none
+                let newConfig = state.currentConfig.with(padding: padding)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
 
             case .updateMaxWidth(let maxWidth):
-                state.maxWidth = maxWidth
-                return .none
+                let newConfig = state.currentConfig.with(maxWidth: maxWidth)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
+
+            case .updateLineHeight(let lineHeight):
+                var config = state.currentConfig
+                config.lineHeight = lineHeight
+                state.currentConfig = config
+                return .send(.updateConfiguration(config))
 
             case .updateWatermark(let watermark):
-                state.watermark = watermark
+                let newConfig = state.currentConfig.with(watermark: watermark)
+                state.currentConfig = newConfig
+                return .send(.updateConfiguration(newConfig))
+
+            case .updateCornerRadius(let cornerRadius):
+                var config = state.currentConfig
+                config.cornerRadius = cornerRadius
+                state.currentConfig = config
+                return .send(.updateConfiguration(config))
+
+            case .updateBorderWidth(let borderWidth):
+                var config = state.currentConfig
+                config.borderWidth = borderWidth
+                state.currentConfig = config
+                return .send(.updateConfiguration(config))
+
+            case .applyPreset(let preset):
+                state.selectedPreset = preset
+                return .run { send in
+                    await fontConfigManager.applyPreset(preset)
+                    await send(.loadConfiguration)
+                }
+
+            case .addToFavorites(let config):
+                return .run { send in
+                    await fontConfigManager.addToFavorites(config)
+                    await send(.loadConfiguration)
+                }
+
+            case .removeFromFavorites(let config):
+                return .run { send in
+                    await fontConfigManager.removeFromFavorites(config)
+                    await send(.loadConfiguration)
+                }
+
+            case .validateConfiguration:
+                return .run { send in
+                    let errors = await fontConfigManager.validateConfiguration(state.currentConfig)
+                    await send(.setValidationErrors(errors))
+                }
+
+            case .setValidationErrors(let errors):
+                state.validationErrors = errors
                 return .none
 
-            case .saveSettings:
-                // This will be implemented in a later step
+            case .resetToDefault:
+                return .run { send in
+                    await fontConfigManager.resetToDefault()
+                    await send(.loadConfiguration)
+                }
+
+            case .clearRecentConfigs:
+                return .run { send in
+                    await fontConfigManager.clearRecentConfigs()
+                    await send(.loadConfiguration)
+                }
+
+            case .toggleAdvancedOptions:
+                state.showAdvancedOptions.toggle()
                 return .none
             }
         }

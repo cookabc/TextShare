@@ -5,8 +5,14 @@ import ComposableArchitecture
 struct TextToShareApp: App {
     let store = Store(initialState: AppFeature.State()) {
         AppFeature()
-        ._printChanges()
+            ._printChanges()
+    } dependency: {
+        FontConfigManagerKey.liveValue
+        FontServiceKey.liveValue
+        FontPreviewGeneratorKey.liveValue
+        FontMetricsCalculatorKey.liveValue
     }
+}
 
     var body: some Scene {
         WindowGroup {
