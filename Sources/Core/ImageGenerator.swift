@@ -1,16 +1,13 @@
 import Foundation
 import AppKit
 import CoreGraphics
+import SwiftUI
 
 // MARK: - Modern Image Generator
 // Modern Swift features: async/await, actor pattern, result types
 
 actor ImageGenerator {
     static let shared = ImageGenerator()
-
-    @Dependency(\.fontService) var fontService
-    @Dependency(\.fontPreviewGenerator) var fontPreviewGenerator
-    @Dependency(\.fontMetricsCalculator) var fontMetricsCalculator
 
     private init() {}
 
@@ -25,13 +22,13 @@ actor ImageGenerator {
         }
 
         // Generate font
-        let font = await fontService.generateFont(
+        let font = await FontService.shared.generateFont(
             family: configuration.fontFamily,
             size: configuration.fontSize
         )
 
         // Calculate optimal size
-        let optimalSize = await fontMetricsCalculator.calculateOptimalImageSize(
+        let optimalSize = await FontMetricsCalculator.shared.calculateOptimalImageSize(
             for: text,
             with: configuration,
             font: font
@@ -118,7 +115,7 @@ actor ImageGenerator {
 
         // Apply color space
         if let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) {
-            context.setColorSpace(colorSpace)
+            context.setFillColorSpace(colorSpace)
         }
     }
 
@@ -134,14 +131,10 @@ actor ImageGenerator {
         let cornerRadius = min(configuration.cornerRadius, min(rect.width, rect.height) / 2)
 
         // Create rounded rectangle path
-        path.addRoundedRect(
-            in: CGRect(rect),
-            cornerWidth: cornerRadius,
-            cornerHeight: cornerRadius
-        )
+        path.addRoundedRect(in: CGRect(x: rect.origin.x, y: rect.origin.y, width: rect.size.width, height: rect.size.height), cornerWidth: cornerRadius, cornerHeight: cornerRadius)
 
         // Fill background
-        context.setFillColor(configuration.theme.primaryColor.cgColor)
+        context.setFillColor(configuration.theme.primaryColor.cgColor ?? CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         context.addPath(path)
         context.fillPath()
     }
@@ -154,13 +147,9 @@ actor ImageGenerator {
         let borderRect = rect.insetBy(dx: configuration.borderWidth / 2, dy: configuration.borderWidth / 2)
 
         let path = CGMutablePath()
-        path.addRoundedRect(
-            in: CGRect(borderRect),
-            cornerWidth: cornerRadius,
-            cornerHeight: cornerRadius
-        )
+        path.addRoundedRect(in: CGRect(x: borderRect.origin.x, y: borderRect.origin.y, width: borderRect.size.width, height: borderRect.size.height), cornerWidth: cornerRadius, cornerHeight: cornerRadius)
 
-        context.setStrokeColor(configuration.theme.accentColor.cgColor)
+        context.setStrokeColor(configuration.theme.accentColor.cgColor ?? CGColor(red: 0, green: 0, blue: 0, alpha: 1))
         context.setLineWidth(configuration.borderWidth)
         context.addPath(path)
         context.strokePath()
@@ -176,7 +165,7 @@ actor ImageGenerator {
         let effectiveWidth = containerSize.width - (configuration.padding * 2)
         let effectiveHeight = containerSize.height - (configuration.padding * 2)
 
-        let textSize = await fontService.calculateTextSize(
+        let textSize = await FontService.shared.calculateTextSize(
             for: text,
             using: font,
             maxWidth: effectiveWidth,
@@ -231,7 +220,7 @@ actor ImageGenerator {
     ) throws {
         let watermarkAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10, weight: .light),
-            .foregroundColor: configuration.theme.textColor.withAlphaComponent(0.3),
+            .foregroundColor: NSColor(configuration.theme.textColor).withAlphaComponent(0.3),
             .paragraphStyle: {
                 let style = NSMutableParagraphStyle()
                 style.alignment = .right
@@ -315,7 +304,7 @@ actor ImageGenerator {
 
         // Test font generation
         do {
-            _ = await fontService.generateFont(
+            _ = await FontService.shared.generateFont(
                 family: configuration.fontFamily,
                 size: configuration.fontSize
             )

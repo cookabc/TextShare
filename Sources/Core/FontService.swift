@@ -12,10 +12,6 @@ actor FontService {
     private let maxCacheSize = 50
 
     private init() {
-        setupCache()
-    }
-
-    private func setupCache() {
         cache.countLimit = maxCacheSize
         cache.evictsObjectsWithDiscardedContent = true
     }
@@ -105,7 +101,7 @@ actor FontService {
         defer { image.unlockFocus() }
 
         // Create a graphics context
-        guard let context = NSGraphicsContext(current: NSGraphicsContext.current!) else {
+        guard let context = NSGraphicsContext.current else {
             throw FontServiceError.renderingFailed
         }
 
