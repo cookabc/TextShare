@@ -164,68 +164,6 @@ enum ModernTheme: String, CaseIterable, Hashable, Codable, ThemeProtocol {
     }
 }
 
-// MARK: - Export Configuration
-struct ExportConfiguration: Codable, Hashable {
-    let fontFamily: ModernFontFamily
-    let fontSize: ModernFontSize
-    let theme: ModernTheme
-    let padding: Double
-    let maxWidth: Double
-    let lineHeight: Double
-    let watermark: String?
-    let cornerRadius: Double
-    let borderWidth: Double
-
-    init(
-        fontFamily: ModernFontFamily = .system,
-        fontSize: ModernFontSize = .medium,
-        theme: ModernTheme = .light,
-        padding: Double = 40,
-        maxWidth: Double = 600,
-        lineHeight: Double = 1.4,
-        watermark: String? = nil,
-        cornerRadius: Double = nil,
-        borderWidth: Double = 2.0
-    ) {
-        self.fontFamily = fontFamily
-        self.fontSize = fontSize
-        self.theme = theme
-        self.padding = padding
-        self.maxWidth = maxWidth
-        self.lineHeight = lineHeight
-        self.watermark = watermark
-        self.cornerRadius = cornerRadius ?? theme.cornerRadius
-        self.borderWidth = borderWidth
-    }
-}
-
-// MARK: - Default Configurations
-extension ExportConfiguration {
-    static let `default` = ExportConfiguration()
-
-    static let codeFocused = ExportConfiguration(
-        fontFamily: .sfMono,
-        fontSize: .medium,
-        theme: .dark,
-        padding: 32
-    )
-
-    static let presentation = ExportConfiguration(
-        fontFamily: .avenir,
-        fontSize: .large,
-        theme: .modern,
-        padding: 60,
-        maxWidth: 800
-    )
-
-    static let minimal = ExportConfiguration(
-        fontFamily: .system,
-        fontSize: .medium,
-        theme: .minimalist,
-        padding: 24,
-        borderWidth: 1.0
-    )
-}
 
 // MARK: - Modern Font Configuration Manager
 @MainActor
@@ -340,19 +278,15 @@ class ModernFontConfigurationManager: ObservableObject {
         var errors: [ConfigurationError] = []
 
         if config.padding < 0 || config.padding > 200 {
-            errors.append(.invalidPadding)
+            errors.append(.invalidPadding(config.padding))
         }
 
         if config.maxWidth < 100 || config.maxWidth > 2000 {
-            errors.append(.invalidMaxWidth)
+            errors.append(.invalidMaxWidth(config.maxWidth))
         }
 
         if config.lineHeight < 0.5 || config.lineHeight > 3.0 {
-            errors.append(.invalidLineHeight)
-        }
-
-        if config.watermark?.count ?? 0 > 100 {
-            errors.append(.watermarkTooLong)
+            errors.append(.invalidLineHeight(config.lineHeight))
         }
 
         return errors
@@ -385,38 +319,6 @@ enum ExportConfigurationPreset: String, CaseIterable {
     }
 }
 
-enum ConfigurationError: LocalizedError {
-    case invalidPadding
-    case invalidMaxWidth
-    case invalidLineHeight
-    case watermarkTooLong
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidPadding:
-            return "Padding must be between 0 and 200"
-        case .invalidMaxWidth:
-            return "Max width must be between 100 and 2000"
-        case .invalidLineHeight:
-            return "Line height must be between 0.5 and 3.0"
-        case .watermarkTooLong:
-            return "Watermark text is too long (max 100 characters)"
-        }
-    }
-
-    var recoverySuggestion: String? {
-        switch self {
-        case .invalidPadding:
-            return "Adjust the padding value to a valid range"
-        case .invalidMaxWidth:
-            return "Set a reasonable maximum width"
-        case .invalidLineHeight:
-            return "Use standard line height values (1.0-1.8)"
-        case .watermarkTooLong:
-            return "Shorten the watermark text"
-        }
-    }
-}
 
 // MARK: - Data Structures for Persistence
 private struct ConfigurationData: Codable {
@@ -501,41 +403,3 @@ struct FontConfigurationView: View {
     }
 }
 
-// MARK: - Extension Methods
-extension ExportConfiguration {
-    func with(fontFamily: ModernFontFamily) -> ExportConfiguration {
-        var config = self
-        config.fontFamily = fontFamily
-        return config
-    }
-
-    func with(fontSize: ModernFontSize) -> ExportConfiguration {
-        var config = self
-        config.fontSize = fontSize
-        return config
-    }
-
-    func with(theme: ModernTheme) -> ExportConfiguration {
-        var config = self
-        config.theme = theme
-        return config
-    }
-
-    func with(padding: Double) -> ExportConfiguration {
-        var config = self
-        config.padding = padding
-        return config
-    }
-
-    func with(maxWidth: Double) -> ExportConfiguration {
-        var config = self
-        config.maxWidth = maxWidth
-        return config
-    }
-
-    func with(watermark: String?) -> ExportConfiguration {
-        var config = self
-        config.watermark = watermark
-        return config
-    }
-}

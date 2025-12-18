@@ -18,6 +18,29 @@ struct ExportConfiguration: Equatable, Codable {
 extension ExportConfiguration {
     static let `default` = ExportConfiguration()
 
+    static let codeFocused = ExportConfiguration(
+        fontFamily: .sfMono,
+        fontSize: .medium,
+        theme: .dark,
+        padding: 32
+    )
+
+    static let presentation = ExportConfiguration(
+        fontFamily: .avenir,
+        fontSize: .large,
+        theme: .modern,
+        padding: 60,
+        maxWidth: 800
+    )
+
+    static let minimal = ExportConfiguration(
+        fontFamily: .system,
+        fontSize: .medium,
+        theme: .minimalist,
+        padding: 24,
+        borderWidth: 1.0
+    )
+
     func with(fontFamily: ModernFontFamily) -> ExportConfiguration {
         var config = self
         config.fontFamily = fontFamily
@@ -77,7 +100,7 @@ extension ExportConfiguration {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let fontFamilyRaw = try container.decode(String.self, forKey: .fontFamily)
-        let fontSizeRaw = try container.decode(String.self, forKey: .fontSize)
+        let fontSizeRaw = try container.decode(Int.self, forKey: .fontSize)
         let themeRaw = try container.decode(String.self, forKey: .theme)
 
         self.fontFamily = ModernFontFamily(rawValue: fontFamilyRaw) ?? .system
