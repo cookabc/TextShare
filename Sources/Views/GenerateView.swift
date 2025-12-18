@@ -5,10 +5,10 @@ import ComposableArchitecture
 // Modern SwiftUI features: async/await, state management, animations
 
 struct GenerateView: View {
-    let store: StoreOf<GenerateFeature.State>
+    let store: StoreOf<GenerateFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             VStack(spacing: 24) {
                 // Text Input Section
                 textInputSection(viewStore: viewStore)
@@ -31,7 +31,7 @@ struct GenerateView: View {
 
 // MARK: - Text Input Section
 private struct textInputSection: View {
-    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature.State>
+    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -57,7 +57,7 @@ private struct textInputSection: View {
 
                 if viewStore.text.isEmpty {
                     Text("请输入要转换成图片的文本...")
-                        .foregroundColor(.tertiary)
+                        .foregroundColor(.secondary.opacity(0.6))
                         .padding(16)
                         .allowsHitTesting(false)
                 }
@@ -78,7 +78,7 @@ private struct textInputSection: View {
 
 // MARK: - Configuration Preview Section
 private struct configurationPreviewSection: View {
-    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature.State>
+    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -96,7 +96,7 @@ private struct configurationPreviewSection: View {
                         Image(systemName: "textformat")
                             .foregroundColor(.accentColor)
                         Text(viewStore.currentConfig.fontFamily.displayName)
-                            .font(viewStore.currentConfig.fontFamily.isCodeFont ? .monospaced(.body) : .body)
+                            .font(viewStore.currentConfig.fontFamily.isCodeFont ? .system(.body, design: .monospaced) : .body)
                         Text("•")
                             .foregroundColor(.secondary)
                         Text(viewStore.currentConfig.fontSize.displayName)
@@ -148,7 +148,7 @@ private struct configurationPreviewSection: View {
 
 // MARK: - Generated Image Section
 private struct generatedImageSection: View {
-    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature.State>
+    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -192,7 +192,7 @@ private struct generatedImageSection: View {
                     VStack(spacing: 12) {
                         Image(systemName: "photo")
                             .font(.system(size: 48))
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(.secondary.opacity(0.6))
 
                         Text("输入文本后点击生成按钮")
                             .font(.body)
@@ -216,7 +216,7 @@ private struct generatedImageSection: View {
 
 // MARK: - Action Buttons Section
 private struct actionButtonsSection: View {
-    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature.State>
+    @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
         HStack(spacing: 16) {
@@ -230,7 +230,7 @@ private struct actionButtonsSection: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .keyboardShortcut("g", modifiers: .command.shift)
+            .keyboardShortcut("g", modifiers: [.command, .shift])
             .disabled(viewStore.text.isEmpty || (viewStore.isGenerating && viewStore.generatedImage == nil))
 
             // Clear Button
@@ -296,10 +296,5 @@ extension GenerateView {
 }
 
 // MARK: - Preview
-#Preview {
-    GenerateView(
-        store: Store(initialState: GenerateFeature.State()) {
-            GenerateFeature()
-        }
-    )
-}
+// MARK: - Preview
+// #Preview temporarily removed due to macro compilation issues
