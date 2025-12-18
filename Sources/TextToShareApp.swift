@@ -13,8 +13,10 @@ struct TextToShareApp: App {
     var body: some Scene {
         WindowGroup {
             AppView(store: store)
+                .background(EffectView(material: .sidebar, blendingMode: .behindWindow).ignoresSafeArea())
         }
         .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Preferences…") {
@@ -23,7 +25,26 @@ struct TextToShareApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 900, height: 650)
+    }
+}
+
+// Helper for window background material
+struct EffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
+    
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
     }
 }
 
@@ -62,36 +83,7 @@ struct AppView: View {
     }
 }
 
-struct SidebarView: View {
-    let store: StoreOf<SidebarFeature>
-
-    var body: some View {
-        WithViewStore(store, observe: { $0 }) { viewStore in
-            List {
-                Button(action: {
-                    viewStore.send(.selectTab(.generate))
-                }) {
-                    Label("Generate", systemImage: "photo")
-                }
-                .tag(SidebarFeature.Tab.generate)
-
-                Button(action: {
-                    viewStore.send(.selectTab(.history))
-                }) {
-                    Label("History", systemImage: "clock")
-                }
-                .tag(SidebarFeature.Tab.history)
-
-                Button(action: {
-                    viewStore.send(.selectTab(.settings))
-                }) {
-                    Label("Settings", systemImage: "gear")
-                }
-                .tag(SidebarFeature.Tab.settings)
-            }
-        }
-    }
-}
+// SidebarView moved to Sources/Views/SidebarView.swift
 
 struct MainContentView: View {
     let store: StoreOf<MainContentFeature>

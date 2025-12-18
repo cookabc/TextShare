@@ -2,7 +2,7 @@ import SwiftUI
 import ComposableArchitecture
 
 // MARK: - Main Generate View
-// Modern SwiftUI features: async/await, state management, animations
+// Premium design with dashboard layout and glassmorphism elements
 
 struct GenerateView: View {
     let store: StoreOf<GenerateFeature>
@@ -11,22 +11,63 @@ struct GenerateView: View {
 
     var body: some View {
         WithViewStore(store, observe: { $0 }) { viewStore in
-            VStack(spacing: DesignTokens.Spacing.lg) {
-                // Text Input Section
-                textInputSection(viewStore: viewStore)
-
-                // Configuration Preview
-                configurationPreviewSection(viewStore: viewStore)
-
-                // Generated Image Display
-                generatedImageSection(viewStore: viewStore)
-
-                // Action Buttons
-                actionButtonsSection(viewStore: viewStore)
+            HSplitView {
+                // Left Panel: Input & Configuration
+                ScrollView {
+                    VStack(spacing: DesignTokens.Spacing.xl) {
+                        // Header
+                        HStack {
+                            Text("Create")
+                                .font(.system(size: 28, weight: .bold))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 4)
+                        
+                        // Text Input
+                        textInputSection(viewStore: viewStore)
+                        
+                        // Configuration Grid
+                        configurationSection(viewStore: viewStore)
+                    }
+                    .padding(DesignTokens.Spacing.lg)
+                }
+                .frame(minWidth: 350, maxWidth: 500)
+                
+                // Right Panel: Output Stage
+                ZStack {
+                    // Background
+                    Color.Semantic.secondaryBackground
+                        .ignoresSafeArea()
+                    
+                    // Dot Pattern or subtle gradient
+                    GeometryReader { proxy in
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.1))
+                            .frame(width: 600, height: 600)
+                            .blur(radius: 100)
+                            .position(x: proxy.size.width * 0.8, y: proxy.size.height * 0.2)
+                        
+                        Circle()
+                            .fill(Color.purple.opacity(0.1))
+                            .frame(width: 400, height: 400)
+                            .blur(radius: 80)
+                            .position(x: proxy.size.width * 0.2, y: proxy.size.height * 0.8)
+                    }
+                    
+                    // Content
+                    VStack(spacing: DesignTokens.Spacing.lg) {
+                        Spacer()
+                        generatedImageSection(viewStore: viewStore)
+                        
+                        actionButtonsSection(viewStore: viewStore)
+                            .padding(.bottom, DesignTokens.Spacing.xl)
+                        Spacer()
+                    }
+                    .padding(DesignTokens.Spacing.xl)
+                }
+                .frame(minWidth: 400, maxWidth: .infinity)
             }
-            .padding(DesignTokens.Spacing.lg)
-            .background(Color(.controlBackgroundColor))
-            .frame(minWidth: 600, minHeight: 500)
+            .background(DesignTokens.Material.content)
             .toast($toast)
             .onChange(of: viewStore.successMessage) { newValue in
                 if let message = newValue {
@@ -46,185 +87,202 @@ struct GenerateView: View {
 // MARK: - Text Input Section
 private struct textInputSection: View {
     @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             HStack {
-                Text(NSLocalizedString("text_input_title", comment: ""))
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
+                Label("Input Text", systemImage: "text.quote")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                
                 Spacer()
-
-                Text(String(format: NSLocalizedString("character_count", comment: ""), viewStore.text.count))
+                
+                Text("\(viewStore.text.count) chars")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
             }
-
+            
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.textBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color(.separatorColor), lineWidth: 1)
-                    )
-
-                if viewStore.text.isEmpty {
-                    Text("请输入要转换成图片的文本...")
-                        .foregroundColor(.secondary.opacity(0.6))
-                        .padding(16)
-                        .allowsHitTesting(false)
-                }
-
                 TextEditor(text: viewStore.binding(
                     get: { $0.text },
                     send: GenerateFeature.Action.updateText
                 ))
+                .font(.system(size: 16, weight: .regular, design: .default))
+                .lineSpacing(4)
                 .padding(12)
-                .background(Color.clear)
-                .font(.system(size: 16))
+                .focused($isFocused)
                 .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .frame(minHeight: 120)
+                
+                if viewStore.text.isEmpty {
+                    Text("Enter text to generate image...")
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                        .padding(16)
+                        .allowsHitTesting(false)
+                }
             }
-            .frame(height: 120)
+            .background(Color.Semantic.tertiaryBackground)
+            .cornerRadius(DesignTokens.CornerRadius.md)
+            .cardStyle(isSelected: isFocused, isHovered: false)
+            .onTapGesture { isFocused = true }
         }
     }
 }
 
-// MARK: - Configuration Preview Section
-private struct configurationPreviewSection: View {
+// MARK: - Configuration Section
+private struct configurationSection: View {
     @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("当前配置")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            HStack(spacing: 16) {
-                // Font Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("字体")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    HStack(spacing: 8) {
-                        Image(systemName: "textformat")
-                            .foregroundColor(.accentColor)
-                        Text(viewStore.currentConfig.fontFamily.displayName)
-                            .font(viewStore.currentConfig.fontFamily.isCodeFont ? .system(.body, design: .monospaced) : .body)
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Text(viewStore.currentConfig.fontSize.displayName)
-                            .font(.body)
-                    }
-                }
-
-                Divider()
-                    .frame(height: 40)
-
-                // Theme Info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("主题")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    HStack(spacing: 8) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(viewStore.currentConfig.theme.primaryColor)
-                            .frame(width: 16, height: 16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .strokeBorder(viewStore.currentConfig.theme.accentColor, lineWidth: 1)
-                            )
-                        Text(viewStore.currentConfig.theme.displayName)
-                            .font(.body)
-                    }
-                }
-
-                Spacer()
-
-                // Settings Button
-                Button("设置...") {
-                    // Navigate to settings - this will be handled by parent
-                }
-                .buttonStyle(.bordered)
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+            Label("Configuration", systemImage: "slider.horizontal.3")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            
+            VStack(spacing: 12) {
+                // Font Card
+                configRow(
+                    icon: "textformat",
+                    title: "Font",
+                    value: viewStore.currentConfig.fontFamily.displayName,
+                    detail: viewStore.currentConfig.fontSize.displayName
+                )
+                
+                // Theme Card
+                configRow(
+                    icon: "paintpalette",
+                    title: "Theme",
+                    value: viewStore.currentConfig.theme.displayName,
+                    color: viewStore.currentConfig.theme.primaryColor
+                )
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.textBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color(.separatorColor), lineWidth: 1)
-                    )
-            )
+            
+            Button(action: {
+                // This would typically trigger navigation or a sheet
+                // Parent view handles actual navigation via tab selection
+            }) {
+                Text("Customize Settings...")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .buttonStyle(.link)
+            .padding(.leading, 4)
         }
+    }
+    
+    // Helper view for config rows
+    private func configRow(icon: String, title: String, value: String, detail: String? = nil, color: Color? = nil) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .frame(width: 32, height: 32)
+                .background(Color.accentColor.opacity(0.1))
+                .foregroundStyle(Color.accentColor)
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.body)
+                    .fontWeight(.medium)
+            }
+            
+            Spacer()
+            
+            if let detail = detail {
+                Text(detail)
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.Semantic.tertiaryBackground)
+                    .cornerRadius(4)
+            }
+            
+            if let color = color {
+                Circle()
+                    .fill(color)
+                    .frame(width: 16, height: 16)
+                    .overlay(Circle().strokeBorder(Color.Semantic.border, lineWidth: 1))
+            }
+        }
+        .padding(12)
+        .background(Color.Semantic.tertiaryBackground.opacity(0.5))
+        .cornerRadius(DesignTokens.CornerRadius.md)
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
+                .strokeBorder(Color.Semantic.borderSubtle, lineWidth: 1)
+        )
     }
 }
 
-// MARK: - Generated Image Section
+// MARK: - Generated Image Section (The Hero)
 private struct generatedImageSection: View {
     @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("生成的图片")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                if viewStore.isGenerating {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("生成中...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
+        ZStack {
+            // Shadow/Glow effect
+            if viewStore.generatedImage != nil {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.accentColor.opacity(0.2))
+                    .blur(radius: 20)
+                    .offset(y: 10)
             }
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(
-                        viewStore.generatedImage != nil ? Color.accentColor : Color(.separatorColor),
-                        lineWidth: viewStore.generatedImage != nil ? 2 : 1
-                    )
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.controlBackgroundColor))
-                    )
-                    .frame(minHeight: 200)
-
+            
+            // Image Container
+            VStack {
                 if let imageData = viewStore.generatedImage,
                    let image = NSImage(data: imageData) {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: 300)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .shadow(radius: 4)
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "photo")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary.opacity(0.6))
-
-                        Text("输入文本后点击生成按钮")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    .allowsHitTesting(false)
-                }
-
-                if viewStore.isGenerating {
-                    Color.black.opacity(0.1)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(1.5)
+                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                } else {
+                    // Empty State
+                    VStack(spacing: 16) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 48, weight: .light))
+                            .foregroundStyle(.secondary.opacity(0.5))
+                        
+                        Text("Ready to Generate")
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Type something on the left and hit Generate")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(DesignTokens.Material.card)
                 }
             }
-            .clipped()
+            .frame(height: 350) // Fixed height for consistency
+            .frame(maxWidth: 600)
+            
+            // Loading Overlay
+            if viewStore.isGenerating {
+                Color.black.opacity(0.2)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .frame(height: 350)
+                    .frame(maxWidth: 600)
+                
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .controlSize(.large)
+                    .tint(.white)
+            }
         }
+        .animation(DesignTokens.Animation.standard, value: viewStore.generatedImage)
+        .animation(DesignTokens.Animation.standard, value: viewStore.isGenerating)
     }
 }
 
@@ -233,96 +291,53 @@ private struct actionButtonsSection: View {
     @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
-        VStack(spacing: DesignTokens.Spacing.md) {
-            HStack(spacing: DesignTokens.Spacing.md) {
-                // Generate/Cancel Button
-                if viewStore.isGenerating {
-                    Button(action: {
-                        viewStore.send(.cancelGeneration)
-                    }) {
-                        HStack(spacing: DesignTokens.Spacing.sm) {
-                            Image(systemName: "stop.fill")
-                            Text(NSLocalizedString("generating", comment: ""))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                } else {
-                    Button(action: {
-                        viewStore.send(.generateImage)
-                    }) {
-                        HStack(spacing: DesignTokens.Spacing.sm) {
-                            Image(systemName: "photo")
-                            Text(NSLocalizedString("generate", comment: ""))
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut("g", modifiers: [.command, .shift])
-                    .disabled(viewStore.text.isEmpty)
-                }
-
-                // Clear Button
-                Button(action: {
-                    viewStore.send(.clearContent)
-                }) {
-                    HStack(spacing: DesignTokens.Spacing.sm) {
-                        Image(systemName: "trash")
-                        Text(NSLocalizedString("clear", comment: ""))
-                    }
+        HStack(spacing: 16) {
+            if viewStore.generatedImage != nil {
+                Button(action: { viewStore.send(.clearContent) }) {
+                    Label("Clear", systemImage: "trash")
+                        .padding(.horizontal, 8)
                 }
                 .buttonStyle(.bordered)
-                .keyboardShortcut("k", modifiers: .command)
-                .disabled(viewStore.text.isEmpty && viewStore.generatedImage == nil)
-
-                Spacer()
-
-                // Save to History Button (only show when image exists)
-                if viewStore.generatedImage != nil && !viewStore.isSavingToHistory {
-                    Button(action: {
-                        viewStore.send(.saveToHistory)
-                    }) {
-                        HStack(spacing: DesignTokens.Spacing.sm) {
-                            Image(systemName: "clock.arrow.circlepath")
-                            Text(NSLocalizedString("save_to_history", comment: ""))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .keyboardShortcut("s", modifiers: .command)
-                }
-
-                // Export Button (only show when image exists)
-                if viewStore.generatedImage != nil && !viewStore.isExporting {
-                    Button(action: {
-                        viewStore.send(.exportImage)
-                    }) {
-                        HStack(spacing: DesignTokens.Spacing.sm) {
-                            Image(systemName: "square.and.arrow.up")
-                            Text(NSLocalizedString("export", comment: ""))
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .keyboardShortcut("e", modifiers: .command)
-                }
-                
-                // Show loading indicator when exporting
-                if viewStore.isExporting || viewStore.isSavingToHistory {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+                .controlSize(.large)
+                .disabled(viewStore.isGenerating)
             }
+            
+            Spacer()
+            
+            if viewStore.generatedImage != nil {
+                Group {
+                    Button(action: { viewStore.send(.saveToHistory) }) {
+                        Label("Save", systemImage: "clock.arrow.circlepath")
+                    }
+                    .disabled(viewStore.isSavingToHistory)
+                    
+                    Button(action: { viewStore.send(.exportImage) }) {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(viewStore.isExporting)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+            
+            Button(action: {
+                if viewStore.isGenerating {
+                    viewStore.send(.cancelGeneration)
+                } else {
+                    viewStore.send(.generateImage)
+                }
+            }) {
+                Label(
+                    viewStore.isGenerating ? "Cancel" : "Generate",
+                    systemImage: viewStore.isGenerating ? "xmark" : "sparkles"
+                )
+                .frame(minWidth: 100)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(viewStore.text.isEmpty && !viewStore.isGenerating)
+            .keyboardShortcut(.defaultAction)
         }
+        .frame(maxWidth: 600)
     }
 }
-
-// MARK: - Generate View Extensions
-extension GenerateView {
-    // Helper method to show configuration settings
-    private func showSettings() {
-        // This would typically navigate to the settings tab
-        // Implementation depends on the parent navigation structure
-    }
-}
-
-// MARK: - Preview
-// MARK: - Preview
-// #Preview temporarily removed due to macro compilation issues
