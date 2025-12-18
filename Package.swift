@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TextToShare",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v13),
         .iOS(.v16),
@@ -23,7 +24,18 @@ let package = Package(
             dependencies: [
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
-            path: "Sources"
+            path: "Sources",
+            resources: [
+                .process("Resources")
+            ]
+        ),
+        .testTarget(
+            name: "TextToShareTests",
+            dependencies: [
+                "TextToShare",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            path: "Tests"
         ),
     ]
 )

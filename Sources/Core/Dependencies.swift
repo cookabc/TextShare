@@ -3,10 +3,12 @@ import AppKit
 import ComposableArchitecture
 
 // MARK: - Dependency System
-// Modern Swift: dependency injection, testable architecture
+// Modern Swift: protocol-based dependency injection for testable architecture
+
+// MARK: - Live Dependencies
 
 struct FontConfigManagerKey: DependencyKey {
-    static let liveValue: ModernFontConfigurationManager = ModernFontConfigurationManager.shared
+    static let liveValue: any FontConfigManaging = ModernFontConfigurationManager.shared
 }
 
 struct FontServiceKey: DependencyKey {
@@ -22,17 +24,20 @@ struct FontMetricsCalculatorKey: DependencyKey {
 }
 
 struct ImageGeneratorKey: DependencyKey {
-    static let liveValue: ImageGenerator = ImageGenerator.shared
+    static let liveValue: any ImageGenerating = ImageGenerator.shared
 }
 
 struct ImageFileManagerKey: DependencyKey {
-    static let liveValue: ImageFileManager = ImageFileManager.shared
+    static let liveValue: any ImageFileManaging = ImageFileManager.shared
 }
 
 // MARK: - Test Dependencies
+// These use mock implementations for proper unit testing isolation
+
 extension FontConfigManagerKey: TestDependencyKey {
-    static var testValue: ModernFontConfigurationManager {
-        ModernFontConfigurationManager.shared
+    @MainActor
+    static var testValue: any FontConfigManaging {
+        MockFontConfigManager()
     }
 }
 
@@ -55,14 +60,13 @@ extension FontMetricsCalculatorKey: TestDependencyKey {
 }
 
 extension ImageGeneratorKey: TestDependencyKey {
-    static var testValue: ImageGenerator {
-        ImageGenerator.shared
+    static var testValue: any ImageGenerating {
+        MockImageGenerator()
     }
 }
 
 extension ImageFileManagerKey: TestDependencyKey {
-    static var testValue: ImageFileManager {
-        ImageFileManager.shared
+    static var testValue: any ImageFileManaging {
+        MockImageFileManager()
     }
 }
-

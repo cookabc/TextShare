@@ -4,7 +4,7 @@ import AppKit
 // MARK: - Image File Manager
 // Modern Swift features: async/await, result types, file management
 
-actor ImageFileManager {
+actor ImageFileManager: ImageFileManaging {
     static let shared = ImageFileManager()
 
     private let documentsDirectory: URL

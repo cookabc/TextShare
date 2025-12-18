@@ -17,7 +17,7 @@ struct HistoryView: View {
 
                 // History Items
                 if viewStore.items.isEmpty {
-                    emptyStateView()
+                    historyEmptyStateView()
                 } else {
                     historyItemsGrid(viewStore: viewStore)
                 }
@@ -132,22 +132,13 @@ private struct filterTab: View {
 }
 
 // MARK: - Empty State View
-private struct emptyStateView: View {
+private struct historyEmptyStateView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 64))
-                .foregroundColor(.secondary.opacity(0.6))
-
-            Text("暂无历史记录")
-                .font(.title2)
-                .fontWeight(.medium)
-
-            Text("生成的图片将会显示在这里")
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyStateView(
+            icon: "clock.arrow.circlepath",
+            title: NSLocalizedString("history_empty_title", comment: ""),
+            description: NSLocalizedString("history_empty_desc", comment: "")
+        )
         .background(Color(.controlBackgroundColor))
     }
 }
@@ -230,33 +221,20 @@ private struct historyItemCard: View {
 
     private func imagePreview(imageData: Data) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.md)
                 .fill(Color(.controlBackgroundColor))
                 .frame(height: 160)
-
-            if let image = NSImage(data: imageData) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: 140)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .shadow(radius: 2)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "photo")
-                        .font(.title2)
-                        .foregroundColor(.secondary.opacity(0.6))
-                    Text("图片加载失败")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
+            
+            AsyncImageDataView(imageData: imageData, contentMode: .fit)
+                .frame(maxHeight: 140)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .shadow(color: DesignTokens.Shadow.light, radius: 2)
         }
     }
 
     private func actionsRow(item: HistoryFeature.HistoryItem) -> some View {
         HStack {
-            Button("重新生成") {
+            Button(NSLocalizedString("regenerate", comment: "")) {
                 viewStore.send(.regenerateFromItem(item.toHistoryItemData))
             }
             .buttonStyle(.borderless)
@@ -264,7 +242,7 @@ private struct historyItemCard: View {
 
             Spacer()
 
-            Button("删除") {
+            Button(NSLocalizedString("delete", comment: "")) {
                 viewStore.send(.removeItem(item.id))
             }
             .buttonStyle(.borderless)

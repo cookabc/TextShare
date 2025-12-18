@@ -1,0 +1,25 @@
+/* General */
+"cancel" = "Cancel";
+"generate" = "Generate Image";
+"generating" = "Cancel Generation";
+"clear" = "Clear";
+"export" = "Export";
+"save_to_history" = "Save to History";
+"text_input_title" = "Enter Text";
+"character_count" = "%d Characters";
+
+/* Messages */
+"msg_enter_text" = "Please enter some text";
+"msg_no_image_export" = "No image to export";
+"msg_no_image_save" = "No image to save";
+"msg_gen_success" = "Image generated successfully";
+"msg_export_success" = "Image exported successfully";
+"msg_save_success" = "Saved to history";
+"msg_save_fail" = "Save failed: %@";
+"msg_export_fail" = "Export failed: %@";
+
+/* History */
+"history_empty_title" = "No History";
+"history_empty_desc" = "Generated images will appear here";
+"regenerate" = "Regenerate";
+"delete" = "Delete";

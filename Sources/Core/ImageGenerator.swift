@@ -6,7 +6,7 @@ import SwiftUI
 // MARK: - Modern Image Generator
 // Modern Swift features: async/await, actor pattern, result types
 
-actor ImageGenerator {
+actor ImageGenerator: ImageGenerating {
     static let shared = ImageGenerator()
 
     private init() {}

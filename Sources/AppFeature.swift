@@ -114,21 +114,36 @@ struct GenerateFeature {
     struct State: Equatable {
         var text = ""
         var isGenerating = false
+        var isExporting = false
+        var isSavingToHistory = false
         var generatedImage: Data?
         var error: String?
+        var successMessage: String?
         var currentConfig = ExportConfiguration.default
     }
 
     enum Action {
         case updateText(String)
         case generateImage
+        case cancelGeneration
         case imageGenerated(Data)
         case generateFailed(String)
         case clearError
+        case clearSuccessMessage
         case clearContent
         case exportImage
+        case exportImageCompleted(URL?)
+        case exportImageFailed(String)
         case updateConfiguration(ExportConfiguration)
         case saveToHistory
+        case saveToHistoryCompleted
+        case saveToHistoryFailed(String)
+    }
+    
+    private enum CancelID {
+        case imageGeneration
+        case export
+        case saveHistory
     }
 
     var body: some Reducer<State, Action> {
@@ -141,7 +156,7 @@ struct GenerateFeature {
 
             case .generateImage:
                 guard !state.text.isEmpty else {
-                    state.error = "请输入一些文本"
+                    state.error = NSLocalizedString("msg_enter_text", comment: "")
                     return .none
                 }
 
@@ -161,11 +176,16 @@ struct GenerateFeature {
                         await send(.generateFailed(error.localizedDescription))
                     }
                 }
-                .cancellable(id: "image-generation")
+                .cancellable(id: CancelID.imageGeneration, cancelInFlight: true)
+                
+            case .cancelGeneration:
+                state.isGenerating = false
+                return .cancel(id: CancelID.imageGeneration)
 
             case .imageGenerated(let imageData):
                 state.isGenerating = false
                 state.generatedImage = imageData
+                state.successMessage = NSLocalizedString("msg_gen_success", comment: "")
                 return .none
 
             case .generateFailed(let errorMessage):
@@ -176,22 +196,48 @@ struct GenerateFeature {
             case .clearError:
                 state.error = nil
                 return .none
+                
+            case .clearSuccessMessage:
+                state.successMessage = nil
+                return .none
 
             case .clearContent:
                 state.text = ""
                 state.generatedImage = nil
                 state.error = nil
+                state.successMessage = nil
                 return .none
 
             case .exportImage:
                 guard let imageData = state.generatedImage else {
-                    state.error = "没有可导出的图片"
+                    state.error = NSLocalizedString("msg_no_image_export", comment: "")
                     return .none
                 }
+                
+                state.isExporting = true
+                state.error = nil
 
                 return .run { send in
-                    await exportImage(imageData)
+                    do {
+                        let url = try await imageFileManager.exportWithSaveDialog(imageData)
+                        await send(.exportImageCompleted(url))
+                    } catch {
+                        await send(.exportImageFailed(error.localizedDescription))
+                    }
                 }
+                .cancellable(id: CancelID.export)
+                
+            case .exportImageCompleted(let url):
+                state.isExporting = false
+                if url != nil {
+                    state.successMessage = NSLocalizedString("msg_export_success", comment: "")
+                }
+                return .none
+                
+            case .exportImageFailed(let errorMessage):
+                state.isExporting = false
+                state.error = String(format: NSLocalizedString("msg_export_fail", comment: ""), errorMessage)
+                return .none
 
             case .updateConfiguration(let config):
                 state.currentConfig = config
@@ -199,9 +245,11 @@ struct GenerateFeature {
 
             case .saveToHistory:
                 guard let imageData = state.generatedImage else {
-                    state.error = "没有可保存的图片"
+                    state.error = NSLocalizedString("msg_no_image_save", comment: "")
                     return .none
                 }
+                
+                state.isSavingToHistory = true
 
                 let historyItem = HistoryItemData(
                     text: state.text,
@@ -212,15 +260,27 @@ struct GenerateFeature {
                 return .run { send in
                     do {
                         try await imageFileManager.saveHistoryItem(historyItem)
+                        await send(.saveToHistoryCompleted)
                     } catch {
-                        // Handle error silently for now, or could send an error action
-                        print("Failed to save to history: \(error)")
+                        await send(.saveToHistoryFailed(error.localizedDescription))
                     }
                 }
+                .cancellable(id: CancelID.saveHistory)
+                
+            case .saveToHistoryCompleted:
+                state.isSavingToHistory = false
+                state.successMessage = NSLocalizedString("msg_save_success", comment: "")
+                return .none
+                
+            case .saveToHistoryFailed(let errorMessage):
+                state.isSavingToHistory = false
+                state.error = String(format: NSLocalizedString("msg_save_fail", comment: ""), errorMessage)
+                return .none
             }
         }
     }
 }
+
 
 // MARK: - Helper Functions
 private func exportImage(_ imageData: Data) async {

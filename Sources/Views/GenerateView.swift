@@ -6,10 +6,12 @@ import ComposableArchitecture
 
 struct GenerateView: View {
     let store: StoreOf<GenerateFeature>
+    
+    @State private var toast: ToastData?
 
     var body: some View {
         WithViewStore(store, observe: { $0 }) { viewStore in
-            VStack(spacing: 24) {
+            VStack(spacing: DesignTokens.Spacing.lg) {
                 // Text Input Section
                 textInputSection(viewStore: viewStore)
 
@@ -22,9 +24,21 @@ struct GenerateView: View {
                 // Action Buttons
                 actionButtonsSection(viewStore: viewStore)
             }
-            .padding(24)
+            .padding(DesignTokens.Spacing.lg)
             .background(Color(.controlBackgroundColor))
             .frame(minWidth: 600, minHeight: 500)
+            .toast($toast)
+            .onChange(of: viewStore.successMessage) { newValue in
+                if let message = newValue {
+                    toast = .success(message)
+                    viewStore.send(.clearSuccessMessage)
+                }
+            }
+            .onChange(of: viewStore.error) { newValue in
+                if let errorMessage = newValue, !errorMessage.isEmpty {
+                    toast = .error(errorMessage)
+                }
+            }
         }
     }
 }
@@ -36,13 +50,13 @@ private struct textInputSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("输入文本")
+                Text(NSLocalizedString("text_input_title", comment: ""))
                     .font(.title2)
                     .fontWeight(.semibold)
 
                 Spacer()
 
-                Text("\(viewStore.text.count) 字符")
+                Text(String(format: NSLocalizedString("character_count", comment: ""), viewStore.text.count))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -219,69 +233,83 @@ private struct actionButtonsSection: View {
     @ObservedObject var viewStore: ViewStoreOf<GenerateFeature>
 
     var body: some View {
-        HStack(spacing: 16) {
-            // Generate Button
-            Button(action: {
-                viewStore.send(.generateImage)
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: viewStore.isGenerating ? "stop.fill" : "photo")
-                    Text(viewStore.isGenerating ? "取消生成" : "生成图片")
+        VStack(spacing: DesignTokens.Spacing.md) {
+            HStack(spacing: DesignTokens.Spacing.md) {
+                // Generate/Cancel Button
+                if viewStore.isGenerating {
+                    Button(action: {
+                        viewStore.send(.cancelGeneration)
+                    }) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
+                            Image(systemName: "stop.fill")
+                            Text(NSLocalizedString("generating", comment: ""))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                } else {
+                    Button(action: {
+                        viewStore.send(.generateImage)
+                    }) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
+                            Image(systemName: "photo")
+                            Text(NSLocalizedString("generate", comment: ""))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .disabled(viewStore.text.isEmpty)
                 }
-            }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut("g", modifiers: [.command, .shift])
-            .disabled(viewStore.text.isEmpty || (viewStore.isGenerating && viewStore.generatedImage == nil))
 
-            // Clear Button
-            Button(action: {
-                viewStore.send(.clearContent)
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "trash")
-                    Text("清空")
-                }
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut("k", modifiers: .command)
-            .disabled(viewStore.text.isEmpty && viewStore.generatedImage == nil)
-
-            Spacer()
-
-            // Export Button (only show when image exists)
-            if viewStore.generatedImage != nil {
+                // Clear Button
                 Button(action: {
-                    viewStore.send(.exportImage)
+                    viewStore.send(.clearContent)
                 }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("导出")
+                    HStack(spacing: DesignTokens.Spacing.sm) {
+                        Image(systemName: "trash")
+                        Text(NSLocalizedString("clear", comment: ""))
                     }
                 }
                 .buttonStyle(.bordered)
-                .keyboardShortcut("e", modifiers: .command)
-            }
-        }
+                .keyboardShortcut("k", modifiers: .command)
+                .disabled(viewStore.text.isEmpty && viewStore.generatedImage == nil)
 
-        // Error Display
-        if let error = viewStore.error {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                Text(error)
-                    .foregroundColor(.red)
-                Button("清除") {
-                    viewStore.send(.clearError)
+                Spacer()
+
+                // Save to History Button (only show when image exists)
+                if viewStore.generatedImage != nil && !viewStore.isSavingToHistory {
+                    Button(action: {
+                        viewStore.send(.saveToHistory)
+                    }) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text(NSLocalizedString("save_to_history", comment: ""))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut("s", modifiers: .command)
                 }
-                .buttonStyle(.borderless)
-                .font(.caption)
+
+                // Export Button (only show when image exists)
+                if viewStore.generatedImage != nil && !viewStore.isExporting {
+                    Button(action: {
+                        viewStore.send(.exportImage)
+                    }) {
+                        HStack(spacing: DesignTokens.Spacing.sm) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text(NSLocalizedString("export", comment: ""))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut("e", modifiers: .command)
+                }
+                
+                // Show loading indicator when exporting
+                if viewStore.isExporting || viewStore.isSavingToHistory {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.red.opacity(0.1))
-            )
         }
     }
 }

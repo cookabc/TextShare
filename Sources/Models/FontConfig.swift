@@ -167,7 +167,7 @@ enum ModernTheme: String, CaseIterable, Hashable, Codable, ThemeProtocol {
 
 // MARK: - Modern Font Configuration Manager
 @MainActor
-class ModernFontConfigurationManager: ObservableObject {
+class ModernFontConfigurationManager: ObservableObject, FontConfigManaging {
     static let shared = ModernFontConfigurationManager()
 
     @Published var currentConfig: ExportConfiguration = .default
