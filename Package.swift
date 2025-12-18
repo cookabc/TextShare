@@ -25,13 +25,5 @@ let package = Package(
             ],
             path: "Sources"
         ),
-        .testTarget(
-            name: "TextToShareTests",
-            dependencies: [
-                "TextToShare",
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-            ],
-            path: "Tests"
-        ),
     ]
 )

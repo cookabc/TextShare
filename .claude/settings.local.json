@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift build:*)",
+      "Bash(lsof:*)",
+      "Bash(osascript:*)",
+      "Bash(pkill:*)",
+      "Bash(.build/arm64-apple-macosx/debug/TextToShare)",
+      "Bash(open:*)",
+      "Bash(log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
