@@ -71,6 +71,46 @@ enum DesignTokens {
         static let thick: CGFloat = 3
     }
     
+    // MARK: - Gradients
+    enum Gradient {
+        static let primary = LinearGradient(
+            colors: [Color.blue, Color.purple],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        
+        static let secondary = LinearGradient(
+            colors: [Color.purple, Color.pink],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        
+        static let subtle = LinearGradient(
+            colors: [Color.white.opacity(0.8), Color.white.opacity(0.4)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        
+        static func card(isHovered: Bool) -> LinearGradient {
+            LinearGradient(
+                colors: [
+                    Color(.textBackgroundColor).opacity(isHovered ? 0.9 : 0.6),
+                    Color(.textBackgroundColor).opacity(isHovered ? 0.7 : 0.4)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    // MARK: - Materials
+    enum Material {
+        static let sidebar = SwiftUI.Material.ultraThin
+        static let content = SwiftUI.Material.regular
+        static let card = SwiftUI.Material.thin
+        static let popover = SwiftUI.Material.thick
+    }
+
     // MARK: - Icon Sizes
     enum IconSize {
         /// 12pt - Tiny icons
@@ -112,6 +152,7 @@ extension Color {
         static let primaryBackground = Color(.windowBackgroundColor)
         static let secondaryBackground = Color(.controlBackgroundColor)
         static let tertiaryBackground = Color(.textBackgroundColor)
+        static let glassBackground = Color(.windowBackgroundColor).opacity(0.5)
         
         // Text Colors
         static let primaryText = Color.primary
@@ -120,8 +161,12 @@ extension Color {
         
         // Border Colors
         static let border = Color(.separatorColor)
-        static let borderSubtle = Color(.separatorColor).opacity(0.5)
-        static let borderStrong = Color(.separatorColor).opacity(1.5)
+        static let borderSubtle = Color(.separatorColor).opacity(0.2)
+        static let borderStrong = Color(.separatorColor).opacity(0.5)
+        
+        // Accents
+        static let accentPrimary = Color.accentColor
+        static let accentSecondary = Color.purple
     }
 }
 
@@ -136,15 +181,23 @@ struct CardStyle: ViewModifier {
             .padding(DesignTokens.Spacing.md)
             .background(
                 RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
-                    .fill(Color(.textBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
-                            .strokeBorder(
-                                isSelected ? Color.accentColor : (isHovered ? Color.accentColor.opacity(0.5) : Color(.separatorColor)),
-                                lineWidth: isSelected || isHovered ? DesignTokens.BorderWidth.medium : DesignTokens.BorderWidth.thin
-                            )
+                    .fill(Color(.textBackgroundColor).opacity(0.8)) // More translucent
+                    .shadow(
+                        color: isHovered ? Color.black.opacity(0.1) : Color.black.opacity(0.05),
+                        radius: isHovered ? 8 : 4,
+                        x: 0,
+                        y: 2
                     )
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.lg)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : (isHovered ? Color.accentColor.opacity(0.3) : Color.Semantic.borderSubtle),
+                        lineWidth: isSelected ? DesignTokens.BorderWidth.medium : DesignTokens.BorderWidth.thin
+                    )
+            )
+            .scaleEffect(isHovered ? 1.005 : 1.0)
+            .animation(DesignTokens.Animation.quick, value: isHovered)
     }
 }
 
