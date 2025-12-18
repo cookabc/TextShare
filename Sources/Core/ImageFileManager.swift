@@ -59,7 +59,7 @@ actor ImageFileManager {
             DispatchQueue.main.async {
                 let savePanel = NSSavePanel()
                 savePanel.allowedContentTypes = [.png]
-                savePanel.nameFieldStringValue = generateFileName()
+                savePanel.nameFieldStringValue = self.generateFileName()
 
                 savePanel.begin { response in
                     if response == .OK, let url = savePanel.url {
@@ -192,12 +192,13 @@ struct HistoryItemData: Codable, Identifiable, Equatable {
         text: String,
         imageData: Data,
         configuration: ExportConfiguration,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        createdAt: Date = Date()
     ) {
         self.id = id
         self.text = text
         self.imageData = imageData
-        self.createdAt = Date()
+        self.createdAt = createdAt
         self.configuration = configuration
         self.isFavorite = isFavorite
     }

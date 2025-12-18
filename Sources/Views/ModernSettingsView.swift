@@ -5,10 +5,10 @@ import ComposableArchitecture
 // Modern SwiftUI features: component composition, async/await, animation
 
 struct ModernSettingsView: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             NavigationView {
                 Form {
                     // Presets Section
@@ -56,10 +56,10 @@ struct ModernSettingsView: View {
 
 // MARK: - Presets Grid
 private struct presetsGrid: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             LazyVGrid(columns: [
                 GridItem(.flexible()),
                 GridItem(.flexible()),
@@ -78,7 +78,7 @@ private struct presetsGrid: View {
 private struct presetCard: View {
     let preset: ExportConfigurationPreset
     let isSelected: Bool
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
         VStack(spacing: 8) {
@@ -136,10 +136,10 @@ extension ExportConfigurationPreset {
 
 // MARK: - Basic Settings Controls
 private struct basicSettingsControls: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             // Font Family
             Picker("Font Family", selection: Binding(
                 get: { viewStore.selectedFontFamily },
@@ -153,7 +153,7 @@ private struct basicSettingsControls: View {
                                 .font(.caption)
                         }
                         Text(family.displayName)
-                            .font(family.isCodeFont ? .monospaced(.caption()) : .body)
+                            .font(family.isCodeFont ? .system(.body, design: .monospaced) : .body)
                     }
                     .tag(family)
                 }
@@ -182,7 +182,7 @@ private struct basicSettingsControls: View {
                 set: { viewStore.send(.updateTheme($0)) }
             )) {
                 ForEach(ModernTheme.allCases, id: \.self) { theme in
-                    themeRow(theme)
+                    themeRow(theme: theme)
                         .tag(theme)
                 }
             }
@@ -218,14 +218,14 @@ private struct themeRow: View {
 }
 
 private struct themePreviewRow: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     Text("Aa Bb Cc")
-                        .font(viewStore.currentConfig.fontFamily.nativeFont)
+                        .font(Font(viewStore.currentConfig.fontFamily.nativeFont))
                         .foregroundColor(viewStore.currentConfig.theme.textColor)
 
                     Text("123 456 789")
@@ -257,10 +257,10 @@ private struct themePreviewRow: View {
 
 // MARK: - Advanced Settings Controls
 private struct advancedSettingsControls: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             // Layout Controls
             Group {
                 HStack {
@@ -305,7 +305,6 @@ private struct advancedSettingsControls: View {
                     get: { viewStore.currentConfig.lineHeight },
                     set: { viewStore.send(.updateLineHeight($0)) }
                 ), in: 0.5...3.0)
-                .step(0.1)
             }
 
             Group {
@@ -335,10 +334,10 @@ private struct advancedSettingsControls: View {
 
 // MARK: - Actions View
 private struct actionsView: View {
-    let store: StoreOf<SettingsFeature.State>
+    let store: StoreOf<SettingsFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             VStack(spacing: 12) {
                 HStack {
                     Button("Reset to Default") {
@@ -381,22 +380,23 @@ private struct validationErrorsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(errors, id: \.self) { error in
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
+            ForEach(errors.indices, id: \.self) { index in
+    let error = errors[index]
+    HStack {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundColor(.orange)
+            .font(.caption)
 
-                    Text(error.errorDescription ?? "Unknown error")
-                        .font(.callout)
-                        .foregroundColor(.red)
+        Text(error.localizedDescription)
+            .font(.callout)
+            .foregroundColor(.red)
 
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(6)
+        Spacer()
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(Color.red.opacity(0.1))
+    .cornerRadius(6)
             }
         }
     }
