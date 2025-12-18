@@ -1,12 +1,13 @@
 import ComposableArchitecture
 import Foundation
+import AppKit
 
 // MARK: - App Feature (Root)
 @Reducer
 struct AppFeature {
     struct State: Equatable {
         var sidebar = SidebarFeature.State()
-        var mainContent = MainContentFeature.State()
+        var mainContent = MainContentFeature.State(selectedTab: .generate)
     }
 
     enum Action {
@@ -15,10 +16,10 @@ struct AppFeature {
     }
 
     var body: some Reducer<State, Action> {
-        Scope(state: \.sidebar, action: /AppFeature.Action.sidebar) {
+        Scope(state: \.sidebar, action: \.sidebar) {
             SidebarFeature()
         }
-        Scope(state: \.mainContent, action: /AppFeature.Action.mainContent) {
+        Scope(state: \.mainContent, action: \.mainContent) {
             MainContentFeature()
         }
     }
@@ -72,7 +73,7 @@ struct SidebarFeature {
 @Reducer
 struct MainContentFeature {
     struct State: Equatable {
-        var selectedTab: SidebarFeature.State.Tab
+        var selectedTab: SidebarFeature.Tab
         var generate = GenerateFeature.State()
         var history = HistoryFeature.State()
         var settings = SettingsFeature.State()
@@ -92,13 +93,13 @@ struct MainContentFeature {
                 return .none
             }
         }
-        Scope(state: \.generate, action: /MainContentFeature.Action.generate) {
+        Scope(state: \.generate, action: \.generate) {
             GenerateFeature()
         }
-        Scope(state: \.history, action: /MainContentFeature.Action.history) {
+        Scope(state: \.history, action: \.history) {
             HistoryFeature()
         }
-        Scope(state: \.settings, action: /MainContentFeature.Action.settings) {
+        Scope(state: \.settings, action: \.settings) {
             SettingsFeature()
         }
     }
@@ -107,8 +108,8 @@ struct MainContentFeature {
 // MARK: - Generate Feature
 @Reducer
 struct GenerateFeature {
-    @Dependency(\.imageGenerator) var imageGenerator
-    @Dependency(\.imageFileManager) var imageFileManager
+    @Dependency(ImageGeneratorKey.self) var imageGenerator
+    @Dependency(ImageFileManagerKey.self) var imageFileManager
 
     struct State: Equatable {
         var text = ""
@@ -146,12 +147,14 @@ struct GenerateFeature {
 
                 state.isGenerating = true
                 state.error = nil
+                let text = state.text
+                let config = state.currentConfig
 
                 return .run { send in
                     do {
                         let imageData = try await imageGenerator.generateImage(
-                            from: state.text,
-                            with: state.currentConfig
+                            from: text,
+                            with: config
                         )
                         await send(.imageGenerated(imageData))
                     } catch {
@@ -267,10 +270,10 @@ private func createTestImageData(for text: String) async -> Data {
 // MARK: - History Feature
 @Reducer
 struct HistoryFeature {
-    @Dependency(\.imageFileManager) var imageFileManager
+    @Dependency(ImageFileManagerKey.self) var imageFileManager
 
     struct State: Equatable {
-        var items: [HistoryItem] = []
+        var items: [HistoryItemData] = []
         var currentFilter: Filter = .all
         var isLoading = false
         var error: String?
@@ -299,7 +302,7 @@ struct HistoryFeature {
     }
 
     struct HistoryItem: Equatable, Identifiable {
-        let id = UUID()
+        let id: UUID
         let text: String
         let imageData: Data
         let createdAt: Date
@@ -314,16 +317,27 @@ struct HistoryFeature {
             self.configuration = data.configuration
             self.isFavorite = data.isFavorite
         }
+
+        var toHistoryItemData: HistoryItemData {
+            return HistoryItemData(
+                id: id,
+                text: text,
+                imageData: imageData,
+                configuration: configuration,
+                isFavorite: isFavorite,
+                createdAt: createdAt
+            )
+        }
     }
 
     enum Action {
         case loadHistory
-        case addItem(HistoryItem)
-        case removeItem(ID)
+        case addItem(HistoryItemData)
+        case removeItem(UUID)
         case clearAll
         case setFilter(Filter)
-        case regenerateFromItem(HistoryItem)
-        case toggleFavorite(ID)
+        case regenerateFromItem(HistoryItemData)
+        case toggleFavorite(UUID)
         case historyLoaded([HistoryItemData])
         case historyLoadFailed(String)
     }
@@ -345,7 +359,7 @@ struct HistoryFeature {
 
             case .historyLoaded(let historyItems):
                 state.isLoading = false
-                state.items = historyItems.map { HistoryItem(from: $0) }
+                state.items = historyItems
                 return .none
 
             case .historyLoadFailed(let errorMessage):
@@ -396,7 +410,7 @@ struct HistoryFeature {
 
 // MARK: - History Feature Extensions
 extension HistoryFeature.State {
-    func filteredItems(for filter: HistoryFeature.State.Filter) -> [HistoryFeature.State.HistoryItem] {
+    func filteredItems(for filter: HistoryFeature.Filter) -> [HistoryItemData] {
         switch filter {
         case .all:
             return items
@@ -412,7 +426,7 @@ extension HistoryFeature.State {
 // MARK: - Settings Feature (Modern)
 @Reducer
 struct SettingsFeature {
-    @Dependency(\.fontConfigManager) var fontConfigManager
+    @Dependency(FontConfigManagerKey.self) var fontConfigManager
 
     struct State: Equatable {
         var currentConfig = ExportConfiguration.default
@@ -449,19 +463,27 @@ struct SettingsFeature {
         case resetToDefault
         case clearRecentConfigs
         case toggleAdvancedOptions
+        case configurationLoaded(currentConfig: ExportConfiguration, recentConfigs: [ExportConfiguration], favoriteConfigs: [ExportConfiguration])
     }
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
             case .loadConfiguration:
-                state.currentConfig = fontConfigManager.currentConfig
-                state.recentConfigs = fontConfigManager.recentConfigs
-                state.favoriteConfigs = fontConfigManager.favoriteConfigs
-                state.selectedFontFamily = state.currentConfig.fontFamily
-                state.selectedFontSize = state.currentConfig.fontSize
-                state.selectedTheme = state.currentConfig.theme
-                return .none
+                return .run { send in
+                    let (currentConfig, recentConfigs, favoriteConfigs) = await MainActor.run {
+                        (
+                            fontConfigManager.currentConfig,
+                            fontConfigManager.recentConfigs,
+                            fontConfigManager.favoriteConfigs
+                        )
+                    }
+                    await send(.configurationLoaded(
+                        currentConfig: currentConfig,
+                        recentConfigs: recentConfigs,
+                        favoriteConfigs: favoriteConfigs
+                    ))
+                }
 
             case .updateConfiguration(let config):
                 state.currentConfig = config
@@ -543,8 +565,9 @@ struct SettingsFeature {
                 }
 
             case .validateConfiguration:
+                let config = state.currentConfig
                 return .run { send in
-                    let errors = await fontConfigManager.validateConfiguration(state.currentConfig)
+                    let errors = await fontConfigManager.validateConfiguration(config)
                     await send(.setValidationErrors(errors))
                 }
 
@@ -566,6 +589,15 @@ struct SettingsFeature {
 
             case .toggleAdvancedOptions:
                 state.showAdvancedOptions.toggle()
+                return .none
+
+            case .configurationLoaded(let currentConfig, let recentConfigs, let favoriteConfigs):
+                state.currentConfig = currentConfig
+                state.recentConfigs = recentConfigs
+                state.favoriteConfigs = favoriteConfigs
+                state.selectedFontFamily = currentConfig.fontFamily
+                state.selectedFontSize = currentConfig.fontSize
+                state.selectedTheme = currentConfig.theme
                 return .none
             }
         }

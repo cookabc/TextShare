@@ -6,13 +6,8 @@ struct TextToShareApp: App {
     let store = Store(initialState: AppFeature.State()) {
         AppFeature()
             ._printChanges()
-    } dependency: {
-        FontConfigManagerKey.liveValue
-        FontServiceKey.liveValue
-        FontPreviewGeneratorKey.liveValue
-        FontMetricsCalculatorKey.liveValue
-        ImageGeneratorKey.liveValue
-        ImageFileManagerKey.liveValue
+    } withDependencies: { _ in
+        // Dependencies are configured through the dependency system
     }
 
     var body: some Scene {
@@ -33,31 +28,31 @@ struct TextToShareApp: App {
 }
 
 struct AppView: View {
-    let store: StoreOf<AppFeature.State>
+    let store: StoreOf<AppFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0.mainContent }) { viewStore in
             NavigationSplitView {
                 // Sidebar
                 SidebarView(store: store.scope(state: \.sidebar, action: AppFeature.Action.sidebar))
                     .navigationTitle("TextToShare")
                     .navigationSplitViewColumnWidth(min: 200, ideal: 250)
-
+            } detail: {
                 // Main Content
                 MainContentView(store: store.scope(state: \.mainContent, action: AppFeature.Action.mainContent))
             }
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button(action: {
-                        viewStore.send(.mainContent(.generateImage))
+                        viewStore.send(.mainContent(.generate(.generateImage)))
                     }) {
                         Image(systemName: "photo")
                         Text("Generate")
                     }
-                    .keyboardShortcut("g", modifiers: .command.shift)
-                    .disabled(viewStore.mainContent.isGenerating)
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .disabled(viewStore.generate.isGenerating)
 
-                    if viewStore.mainContent.isGenerating {
+                    if viewStore.generate.isGenerating {
                         ProgressView()
                             .controlSize(.small)
                     }
@@ -68,36 +63,48 @@ struct AppView: View {
 }
 
 struct SidebarView: View {
-    let store: StoreOf<SidebarFeature.State>
+    let store: StoreOf<SidebarFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
-            List(selection: $viewStore.binding(\.$selectedTab, send: SidebarFeature.Action.selectTab)) {
-                Label("Generate", systemImage: "photo")
-                    .tag(SidebarFeature.State.Tab.generate)
+        WithViewStore(store, observe: { $0 }) { viewStore in
+            List {
+                Button(action: {
+                    viewStore.send(.selectTab(.generate))
+                }) {
+                    Label("Generate", systemImage: "photo")
+                }
+                .tag(SidebarFeature.Tab.generate)
 
-                Label("History", systemImage: "clock")
-                    .tag(SidebarFeature.State.Tab.history)
+                Button(action: {
+                    viewStore.send(.selectTab(.history))
+                }) {
+                    Label("History", systemImage: "clock")
+                }
+                .tag(SidebarFeature.Tab.history)
 
-                Label("Settings", systemImage: "gear")
-                    .tag(SidebarFeature.State.Tab.settings)
+                Button(action: {
+                    viewStore.send(.selectTab(.settings))
+                }) {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(SidebarFeature.Tab.settings)
             }
         }
     }
 }
 
 struct MainContentView: View {
-    let store: StoreOf<MainContentFeature.State>
+    let store: StoreOf<MainContentFeature>
 
     var body: some View {
-        WithViewStore(store) { viewStore in
+        WithViewStore(store, observe: { $0 }) { viewStore in
             switch viewStore.selectedTab {
             case .generate:
-                GenerateContentView(store: store.scope(state: \.generate, action: MainContentFeature.Action.generate))
+                GenerateContentView(store: store.scope(state: \.generate, action: \.generate))
             case .history:
-                HistoryContentView(store: store.scope(state: \.history, action: MainContentFeature.Action.history))
+                HistoryContentView(store: store.scope(state: \.history, action: \.history))
             case .settings:
-                SettingsContentView(store: store.scope(state: \.settings, action: MainContentFeature.Action.settings))
+                SettingsContentView(store: store.scope(state: \.settings, action: \.settings))
             }
         }
         .onAppear {
